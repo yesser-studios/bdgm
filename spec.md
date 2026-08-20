@@ -47,8 +47,8 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 
 ## Executable
 The executable is a file runnable by the selected runtime (or a `.exe` file in the case of `windows`).
-It must be located in `APP/` and is strongly suggested to not be in a subdirectory of `APP/`.
-If that is impossible, do not use a wrapper and instead set the `executable` field to the actual path of the executable.
+It must be located in `APP/`.
+It should not be in a subdirectory of `APP/`. If that is impossible, it must not be a wrapper. Instead, set the `executable` field to the actual path of the executable.
 The executable must function without internet access (it must not crash because of no internet access, it may show a connection error screen instead).
 
 ## Runtimes
@@ -81,7 +81,7 @@ If possible by the operating system, the player may provide write redirection to
 The player must:
 1. Locate `/BDGM/DISC.BDGM`, and reject disc otherwise.
 2. Parse the contents of `DISC.BDGM`.
-3. Check if the path is valid, is not an absolute path, and doesn't contain forbidden components.
+3. Validate the `executable` path based on rules defined above.
 4. Verify the executable referenced in `DISC.BDGM` exists.
 5. Locate an appropriate runtime, either installed on the user's OS (via `PATH`) or bundled with the player. If none are present, the player may download one or prompt the user to install one.
     If the user rejects installation of a missing runtime, or one cannot be downloaded, the disc must be rejected.
@@ -93,7 +93,7 @@ The player must:
 ### Environment variables
 These environment variables must be provided by the players. Games may read these variables to get assets or save data.
 - `BDGM_DATA`: The data dir created by the player. This must be persistent between game executions.
-- `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running.
+- `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running. The player must not delete it while the game is running.
 - `BDGM_APP`: The path to the `APP` directory, not the executable's directory.
 - `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
 - `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.0`)
