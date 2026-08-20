@@ -56,7 +56,7 @@ The executable must function without internet access (it must not crash because 
     - The executable must be a runtime-dependent architecture-agnostic build.
 - `dotnet` - uses a .NET runtime of the specified major version to run the .dll file. `runtime_version` specifies the version of the *.NET runtime*, not the C# version.
     - The executable must be a runtime-dependent architecture-agnostic build.
-- `python` - uses a Python interpreter of the specified version to run the python file. `runtime_version` specifies the exact Python *major and minor* version separated with a period. (e.g. `runtime_version=3.14`)
+- `python` - uses a Python interpreter of the specified version to run the python file. `runtime_version` specifies the Python *major and minor* version separated with a period. (e.g. `runtime_version=3.14`)
     - The executable must be a `.py` or `.pyz` file.
     - The player must run `.py` and `.pyz` files through the filesystem path, not as a module.
     - The `.pyz` file must include all Python code and pure Python dependencies.
@@ -71,6 +71,7 @@ The game should access resources using a path relative to the running bundle/exe
 ## Player
 The player is an application installed on the user's operating system that reads the BDGM disc or image and runs the game. It may bundle common versions of runtimes.
 Whether bundled runtimes are used instead of user-installed ones depends on the player and/or user preference.
+The player must only use runtimes compatible with the major version specified in `DISC.BDGM`. A newer runtime may only be used if known to be compatible with the specified version.
 The player must create and provide a writable data and cache directory for the game. These must be different (though they may be nested).
 Each game's cache and data directories must be different. Different games must be identified via `id`.
 Different versions of games with the same `id` must use the same data directory.
