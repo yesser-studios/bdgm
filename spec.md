@@ -1,5 +1,5 @@
 # BDGM Blu-Ray Disc Game specification
-BDGM is a UDF 2.50 specification for storing a cross-platform game.
+BDGM is a UDF specification for storing a cross-platform game.
 ## Folder structure
 - BDGM/
     - DISC.BDGM
