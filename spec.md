@@ -7,7 +7,7 @@ BDGM is a UDF 2.50 specification for storing a cross-platform game.
         - executable, runtime dependencies, resources
 - The BDGM application root is `/BDGM/`.
 - Paths use the `/` separator and are case-sensitive.
-- File names are UTF-8.
+- Names of BDGM-defined files and directories must be UTF-8.
 - The BDGM file system must be considered read-only by the game and player.
 
 ## DISC.BDGM
@@ -28,8 +28,8 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 ### BDGM/1.0
 - Keys:
     - `name`: The name of the stored game, spaces included. Mandatory.
-    - `id`: The unique identifier of the stored game in the period-separated kebab-case (spaces are `-`) reverse domain notation. Mandatory.
-        - Uses lowercase ASCII characters, digits and hyphens.
+    - `id`: The unique identifier of the stored game in the period-separated kebab-case reverse domain notation. Mandatory.
+        - Uses lowercase ASCII characters, digits and hyphens. Spaces are not permitted.
         - This ID must not change between versions.
         - Separating different components in a larger piece of work within the ID is allowed, such as: `com.example.example-game.main-game`
         - Example: `com.example.my-game`.
@@ -38,10 +38,12 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
     - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows`, otherwise mandatory.
     - `executable`: The path to the executable to run using the runtime. This is a path to the file relative to the BDGM/APP directory. Mandatory.
         - Absolute paths and `.` or `..` path components are forbidden. An initial `/` is forbidden.
-        - The path must resolve to a file within `/BDGM/APP/`
+        - The path must resolve to a regular file within `/BDGM/APP/` and must not resolve outside the directory.
         - Example: `executable=game.jar`
     - `args`: Arguments passed to the executable in a JSON array. If running through a runtime, these are often passed after ` -- `, depending on the runtime. Optional.
     - `runtime_args`: Arguments passed to the runtime itself in a JSON array. For `windows`, these are resolved only if running on another operating system than Windows. Optional.
+
+`args` and `runtime_args` must be valid JSON arrays containing only string elements. Each element represents exactly one argument. No shell parsing is performed.
 
 ## Executable
 The executable is a file runnable by the selected runtime (or a `.exe` file in the case of `windows`).
@@ -56,7 +58,7 @@ The executable must function without internet access (it must not crash because 
     - The executable must be a runtime-dependent architecture-agnostic build.
 - `python` - uses a Python interpreter of the specified version to run the python file. `runtime_version` specifies the exact Python *major and minor* version separated with a period. (e.g. `runtime_version=3.14`)
     - The executable must be a `.py` or `.pyz` file.
-    - Unzipped `.py` files must run through file path, not module path.
+    - The player must run `.py` and `.pyz` files through the filesystem path, not as a module.
     - The `.pyz` file must include all Python code and pure Python dependencies.
     - Native dependencies (such as `pygame`) must be included in the `APP/` directory for all supported platforms. These dependencies must be importable by normal Python import or any executable-defined loading mechanism.
     - If supplying dependencies with the above restrictions is unfeasible, you may use a bundler such as `pyinstaller` to make a self-contained x86_64 Windows binary and select the `windows` runtime and use a compatibility layer.
@@ -70,15 +72,18 @@ The game should access resources using a path relative to the running bundle/exe
 The player is an application installed on the user's operating system that reads the BDGM disc or image and runs the game. It may bundle common versions of runtimes.
 Whether bundled runtimes are used instead of user-installed ones depends on the player and/or user preference.
 The player must create and provide a writable data and cache directory for the game. These must be different (though they may be nested).
-Each game's cache and data directories must be different. (Different games must be identified via `id` and not `version`)
+Each game's cache and data directories must be different. Different games must be identified via `id`.
+Different versions of games with the same `id` must use the same data directory.
+Cache directory may be emptied or replaced before running a game with a different version.
 If possible by the operating system, the player may provide write redirection to the data directory for games that write data into the installation or current working directory.
-The player must:
 
+The player must:
 1. Locate `/BDGM/DISC.BDGM`, and reject disc otherwise.
 2. Parse the contents of `DISC.BDGM`.
 3. Check if the path is valid, is not an absolute path, and doesn't contain forbidden components.
 4. Verify the executable referenced in `DISC.BDGM` exists.
-5. Locate an appropriate runtime, either installed on the user's OS (via `PATH`) or bundled with the player. If not present, it may download one or prompt the user to install one themselves. If user rejects, or one cannot be downloaded, the disc must be rejected.
+5. Locate an appropriate runtime, either installed on the user's OS (via `PATH`) or bundled with the player. If none are present, the player may download one or prompt the user to install one.
+    If the user rejects installation of a missing runtime, or one cannot be downloaded, the disc must be rejected.
 6. Set the CWD to the executable's directory.
 7. Set up directory redirection for games placing data in executable directory if possible and supported by the player.
 8. Set system envvars to the directories created by the player and set BDGM environment variables.
@@ -90,4 +95,5 @@ These environment variables must be provided by the players. Games may read thes
 - `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running.
 - `BDGM_APP`: The path to the `APP` directory, not the executable's directory.
 - `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
+- `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.0`)
 Games must not assume these paths are on the same storage device.
