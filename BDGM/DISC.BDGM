@@ -3,6 +3,6 @@ BDGM/1.0
 name=Test Game
 id=io.github.yesseruser.test-game
 version=1.0.0
-runtime=java
-runtime_version=17
-executable=game.jar
+runtime=python
+runtime_version=14
+executable=game.py
