@@ -3,6 +3,8 @@ name = "bdgm"
 description = "A library for handling Blu-Ray Disc Game discs"
 version = "0.0.1"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/yesser-studios/bdgm"
 
 [dependencies]
 serde = {version = "1", features = ["derive"]}
