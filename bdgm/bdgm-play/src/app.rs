@@ -1,24 +1,18 @@
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::Read,
-    process::Command,
-    string::String,
-};
+use std::{collections::HashMap, fs::File, io::Read, process::Command, string::String};
 
 use bdgm::{error::BDGMError, game::Game};
 use clap::Parser;
 use fs_extra::dir::{self, CopyOptions};
 use hadris_udf::UdfVolume;
 use platform_dirs::AppDirs;
-use tempfile::{TempDir, tempdir};
+use tempfile::tempdir;
 
 use crate::{args::Args, dump::extract_udf_dir, error::AppError};
 
 #[cfg(windows)]
 use crate::dump::dump_disc;
 #[cfg(windows)]
-use tempfile::tempfile;
+use tempfile::NamedTempFile;
 
 pub(crate) fn run() -> anyhow::Result<()> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
@@ -28,6 +22,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
         let args = Args::parse();
         println!("Playing {}", args.location.to_string_lossy());
 
+        #[allow(unused_assignments)]
         let mut raw_disc = false;
         #[cfg(windows)]
         {
@@ -40,13 +35,13 @@ pub(crate) fn run() -> anyhow::Result<()> {
             } else {
                 #[cfg(windows)]
                 {
-                    let dump_file = tempfile()?;
+                    let dump_file = NamedTempFile::new()?;
                     dump_disc(
                         &args.location.to_string_lossy(),
-                        &dump_file.to_string_lossy(),
+                        &dump_file.path().to_string_lossy(),
                     )?;
 
-                    File::open(&dump_file)?
+                    File::open(dump_file.path())?
                 }
                 #[cfg(not(windows))]
                 {
@@ -55,7 +50,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
             };
 
             let udf = UdfVolume::open(file)?;
-            extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir.path())?;
+            extract_udf_dir(&udf, &udf.root_dir()?, extract_dir.path())?;
             #[cfg(windows)]
             {
                 Args {
