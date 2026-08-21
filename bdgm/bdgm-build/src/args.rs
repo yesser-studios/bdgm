@@ -10,7 +10,7 @@ pub(crate) struct Args {
     pub source: PathBuf,
     /// The target .udf image file
     pub output: PathBuf,
-    /// Whether to create a UDF 2.01 image for DVDs instead of UDF 2.50
+    /// Whether to create a UDF 2.01 image for CDs and DVDs instead of UDF 2.50
     #[arg(long)]
     pub dvd: bool,
 }
