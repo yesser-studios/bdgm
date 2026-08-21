@@ -114,7 +114,6 @@ impl Entry {
                     .iter()
                     .find(|it| match it {
                         Entry::File { source, path } => {
-                            println!("{}", path.to_string_lossy());
                             if path == "DISC.BDGM" {
                                 manifest_path = source.to_path_buf();
                                 true
