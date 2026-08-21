@@ -4,7 +4,7 @@ To run a BDGM disc, you'll need a BDGM player installed. A very simple one is `b
 
 ## Windows
 To install `bdgm-play`, we're going to need Rust and VS Build Tools.
-Download rustup-init.exe for your architecture from: https://rust-lang.org/learn/get-started/ and run it. It should also install VS Build Tools.
+Download rustup-init.exe for your architecture from: <https://rust-lang.org/learn/get-started/> and run it. It should also install VS Build Tools.
 After everything is installed, run `cargo install bdgm-play` in PowerShell to build and install `bdgm-play`.
 
 After inserting a BDGM disc, an error may be shown that the disc could not be read. **This is fine**, because Windows decided to only support a small set of UDF discs.
@@ -20,7 +20,7 @@ bdgm-play --raw-disc \\.\L:
 ## Linux
 On Linux, this process is easier because the kernel can actually mount BDGM discs.
 
-To install `bdgm-play`, you need to install `cargo` from your package manager or using rustup; see https://rust-lang.org/learn/get-started/.
+To install `bdgm-play`, you need to install `cargo` from your package manager or using rustup; see <https://rust-lang.org/learn/get-started/>.
 Then, run `cargo install bdgm-play`. Make sure `~/.cargo/bin` is in your `PATH`.
 
 First, if your DE hasn't done this already, mount the disc to any readable directory. Then, run:
