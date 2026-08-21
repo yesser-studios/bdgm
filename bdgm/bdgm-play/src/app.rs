@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fs::File, io::Read, process::Command, string::String};
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    io::Read,
+    process::Command,
+    string::String,
+};
 
 use bdgm::{error::BDGMError, game::Game};
 use clap::Parser;
@@ -34,6 +40,9 @@ pub(crate) fn run() -> anyhow::Result<()> {
 
             let udf = UdfVolume::open(file)?;
             let extract_dir = app_dirs.data_dir.join("extract");
+            if extract_dir.exists() {
+                fs::remove_dir_all(&extract_dir)?;
+            }
             extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir)?;
             Args {
                 location: extract_dir,
