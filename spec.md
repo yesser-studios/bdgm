@@ -97,4 +97,5 @@ These environment variables must be provided by the players. Games may read thes
 - `BDGM_APP`: The path to the `APP` directory, not the executable's directory.
 - `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
 - `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.0`)
+- `WINEPREFIX`: Only if the game is `windows`; must be set to a writable location.
 Games must not assume these paths are on the same storage device.
