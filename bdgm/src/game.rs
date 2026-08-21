@@ -6,14 +6,14 @@ use crate::{error::ParserError, runtime::Runtime};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Game {
-    name: String,
-    id: String,
-    version: String,
-    executable: String,
-    args: Vec<String>,
-    runtime: Runtime,
-    runtime_version: String,
-    runtime_args: Vec<String>,
+    pub name: String,
+    pub id: String,
+    pub version: String,
+    pub executable: String,
+    pub args: Vec<String>,
+    pub runtime: Runtime,
+    pub runtime_version: String,
+    pub runtime_args: Vec<String>,
 }
 
 impl Game {
