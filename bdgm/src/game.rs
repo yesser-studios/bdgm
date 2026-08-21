@@ -93,7 +93,19 @@ impl Game {
             }
         }
 
-        Ok(result)
+        if result.name == "" {
+            Err(ParserError::MissingField("name".to_string()).into())
+        } else if result.id == "" {
+            Err(ParserError::MissingField("id".to_string()).into())
+        } else if result.version == "" {
+            Err(ParserError::MissingField("version".to_string()).into())
+        } else if result.runtime_version == "" && !matches!(result.runtime, Runtime::Windows) {
+            Err(ParserError::MissingField("runtime_version".to_string()).into())
+        } else if result.executable == "" {
+            Err(ParserError::MissingField("executable".to_string()).into())
+        } else {
+            Ok(result)
+        }
     }
 }
 

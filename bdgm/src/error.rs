@@ -5,6 +5,7 @@ use thiserror::Error;
 pub enum ParserError {
     InvalidHeader,
     InvalidRuntime,
+    MissingField(String),
 }
 
 impl Display for ParserError {
@@ -12,6 +13,7 @@ impl Display for ParserError {
         match self {
             ParserError::InvalidHeader => write!(f, "Invalid header!"),
             ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
+            ParserError::MissingField(field) => write!(f, "Missing mandatory field: {field}!"),
         }
     }
 }
