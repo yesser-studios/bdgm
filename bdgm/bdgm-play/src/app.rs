@@ -90,14 +90,22 @@ pub(crate) fn run() -> anyhow::Result<()> {
                 .status()?;
         }
         bdgm::runtime::Runtime::Windows => {
-            Command::new("wine")
-                .args(game.runtime_args)
-                .arg(install_dir.join(game.executable))
-                .args(game.args)
-                .envs(envvars)
-                .env("WINEPREFIX", game_dir.join("wineprefix"))
-                .current_dir(&install_dir)
-                .status()?;
+            if cfg!(target_os = "windows") {
+                Command::new(install_dir.join(game.executable))
+                    .args(game.args)
+                    .envs(envvars)
+                    .current_dir(&install_dir)
+                    .status()?;
+            } else {
+                Command::new("wine")
+                    .args(game.runtime_args)
+                    .arg(install_dir.join(game.executable))
+                    .args(game.args)
+                    .envs(envvars)
+                    .env("WINEPREFIX", game_dir.join("wineprefix"))
+                    .current_dir(&install_dir)
+                    .status()?;
+            }
         }
     };
 
