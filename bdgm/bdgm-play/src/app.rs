@@ -1,44 +1,16 @@
-use std::{
-    collections::HashMap,
-    fs::{self, File, OpenOptions},
-    io::Read,
-    os::windows::fs::OpenOptionsExt,
-    path::Path,
-    process::Command,
-    string::String,
-};
+use std::{collections::HashMap, fs::File, io::Read, process::Command, string::String};
 
 use bdgm::{error::BDGMError, game::Game};
 use clap::Parser;
 use fs_extra::dir::{self, CopyOptions};
-use hadris_udf::{UdfDir, UdfVolume};
+use hadris_udf::UdfVolume;
 use platform_dirs::AppDirs;
 
-use crate::{args::Args, dump::dump_disc, error::AppError};
-
-const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
-
-fn extract_udf_dir(udf: &UdfVolume<File>, dir: &UdfDir, output_path: &Path) -> anyhow::Result<()> {
-    for entry in dir.entries() {
-        if entry.is_parent() {
-            continue;
-        }
-
-        let name = entry.name();
-        if entry.is_dir() {
-            let child_path = output_path.join(name);
-            fs::create_dir_all(&child_path)?;
-            let child = udf.read_directory(&entry.icb)?;
-            extract_udf_dir(udf, &child, &child_path)?;
-        } else {
-            let file_path = output_path.join(name);
-            let bytes = udf.read_file(entry)?;
-            fs::write(&file_path, bytes)?;
-        }
-    }
-
-    Ok(())
-}
+use crate::{
+    args::Args,
+    dump::{dump_disc, extract_udf_dir},
+    error::AppError,
+};
 
 pub(crate) fn run() -> anyhow::Result<()> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;

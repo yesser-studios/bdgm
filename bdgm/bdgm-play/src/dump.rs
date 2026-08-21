@@ -1,10 +1,11 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    os::windows::fs::OpenOptionsExt,
-    os::windows::io::AsRawHandle,
+    os::windows::{fs::OpenOptionsExt, io::AsRawHandle},
+    path::Path,
 };
 
+use hadris_udf::{UdfDir, UdfVolume};
 use windows_sys::Win32::{
     Foundation::HANDLE,
     System::{
@@ -97,6 +98,32 @@ pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     }
 
     output.flush()?;
+
+    Ok(())
+}
+
+pub(crate) fn extract_udf_dir(
+    udf: &UdfVolume<File>,
+    dir: &UdfDir,
+    output_path: &Path,
+) -> anyhow::Result<()> {
+    for entry in dir.entries() {
+        if entry.is_parent() {
+            continue;
+        }
+
+        let name = entry.name();
+        if entry.is_dir() {
+            let child_path = output_path.join(name);
+            fs::create_dir_all(&child_path)?;
+            let child = udf.read_directory(&entry.icb)?;
+            extract_udf_dir(udf, &child, &child_path)?;
+        } else {
+            let file_path = output_path.join(name);
+            let bytes = udf.read_file(entry)?;
+            fs::write(&file_path, bytes)?;
+        }
+    }
 
     Ok(())
 }
