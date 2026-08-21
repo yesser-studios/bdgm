@@ -11,14 +11,18 @@ use clap::Parser;
 use fs_extra::dir::{self, CopyOptions};
 use hadris_udf::UdfVolume;
 use platform_dirs::AppDirs;
+use tempfile::{TempDir, tempdir};
 
 use crate::{args::Args, dump::extract_udf_dir, error::AppError};
 
 #[cfg(windows)]
 use crate::dump::dump_disc;
+#[cfg(windows)]
+use tempfile::tempfile;
 
 pub(crate) fn run() -> anyhow::Result<()> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
+    let extract_dir = tempdir()?;
 
     let args = {
         let args = Args::parse();
@@ -36,7 +40,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
             } else {
                 #[cfg(windows)]
                 {
-                    let dump_file = app_dirs.data_dir.join("dump.bin");
+                    let dump_file = tempfile()?;
                     dump_disc(
                         &args.location.to_string_lossy(),
                         &dump_file.to_string_lossy(),
@@ -51,15 +55,11 @@ pub(crate) fn run() -> anyhow::Result<()> {
             };
 
             let udf = UdfVolume::open(file)?;
-            let extract_dir = app_dirs.data_dir.join("extract");
-            if extract_dir.exists() {
-                fs::remove_dir_all(&extract_dir)?;
-            }
-            extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir)?;
+            extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir.path())?;
             #[cfg(windows)]
             {
                 Args {
-                    location: extract_dir,
+                    location: extract_dir.path().to_path_buf(),
                     image: false,
                     raw_disc: false,
                 }
@@ -67,7 +67,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
             #[cfg(not(windows))]
             {
                 Args {
-                    location: extract_dir,
+                    location: extract_dir.path().to_path_buf(),
                     image: false,
                 }
             }
