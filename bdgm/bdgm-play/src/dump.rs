@@ -1,6 +1,7 @@
 use hadris_udf::{UdfDir, UdfVolume};
 use std::{
     fs::{self, File},
+    io::{Seek, SeekFrom},
     path::Path,
 };
 
@@ -25,6 +26,58 @@ use windows_sys::Win32::{
 const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
 #[cfg(windows)]
 const SECTOR_SIZE: usize = 2048;
+
+#[cfg(windows)]
+fn read_sector<R: Read + Seek>(
+    r: &mut R,
+    sector: u64,
+    buf: &mut [u8; SECTOR_SIZE],
+) -> io::Result<()> {
+    r.seek(SeekFrom::Start(sector * SECTOR_SIZE as u64))?;
+    r.read_exact(buf)
+}
+
+#[cfg(windows)]
+fn tag_id(sector: &[u8]) -> u16 {
+    u16::from_le_bytes([sector[0], sector[1]])
+}
+
+/// Returns the exclusive end sector of the UDF partition(s) — i.e. the
+/// last sector you actually need to copy off the disc.
+#[cfg(windows)]
+fn find_udf_end_sector<R: Read + Seek>(drive: &mut R) -> io::Result<u64> {
+    let mut buf = [0u8; SECTOR_SIZE];
+
+    // Primary Anchor Volume Descriptor Pointer is always at sector 256.
+    read_sector(drive, 256, &mut buf)?;
+    if tag_id(&buf) != 2 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "no AVDP at sector 256",
+        ));
+    }
+
+    let mvds_len = u32::from_le_bytes(buf[16..20].try_into().unwrap()) as u64; // bytes
+    let mvds_loc = u32::from_le_bytes(buf[20..24].try_into().unwrap()) as u64; // sector
+    let mvds_sectors = mvds_len.div_ceil(SECTOR_SIZE as u64);
+
+    let mut max_end: u64 = 0;
+    for i in 0..mvds_sectors {
+        read_sector(drive, mvds_loc + i, &mut buf)?;
+        match tag_id(&buf) {
+            5 => {
+                // Partition Descriptor: start (u32 @188) + length (u32 @192), both in sectors
+                let start = u32::from_le_bytes(buf[188..192].try_into().unwrap()) as u64;
+                let len = u32::from_le_bytes(buf[192..196].try_into().unwrap()) as u64;
+                max_end = max_end.max(start + len);
+            }
+            8 | 0 => break, // Terminating Descriptor (or blank/unused) ends the sequence
+            _ => {}
+        }
+    }
+
+    Ok(max_end)
+}
 
 #[cfg(windows)]
 fn disc_size(file: &File) -> io::Result<u64> {
@@ -94,7 +147,20 @@ pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
 
     let sectors = size / SECTOR_SIZE as u64;
 
-    for sector in 0..sectors {
+    let udf_end = find_udf_end_sector(&mut drive).unwrap_or_else(|e| {
+        eprintln!("{}; dumping whole disc", e);
+        sectors
+    });
+    let sectors_to_copy = udf_end.min(sectors);
+    drive.seek(SeekFrom::Start(0))?;
+
+    println!(
+        "Dumped partition size: {} bytes ({:.2} MiB)",
+        sectors_to_copy * SECTOR_SIZE as u64,
+        (sectors_to_copy * SECTOR_SIZE as u64) as f64 / 1024.0 / 1024.0
+    );
+
+    for sector in 0..sectors_to_copy {
         drive.read_exact(&mut buffer)?;
         output.write_all(&buffer)?;
 
@@ -102,8 +168,8 @@ pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
             println!(
                 "{}/{} sectors ({:.1}%)",
                 sector,
-                sectors,
-                sector as f64 * 100.0 / sectors as f64
+                sectors_to_copy,
+                sector as f64 * 100.0 / sectors_to_copy as f64
             );
         }
     }
