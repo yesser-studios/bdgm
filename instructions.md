@@ -20,6 +20,9 @@ bdgm-play --raw-disc \\.\L:
 ## Linux
 On Linux, this process is easier because the kernel can actually mount BDGM discs.
 
+To install `bdgm-play`, you need to install `cargo` from your package manager or using rustup; see https://rust-lang.org/learn/get-started/.
+Then, run `cargo install bdgm-play`. Make sure `~/.cargo/bin` is in your `PATH`.
+
 First, if your DE hasn't done this already, mount the disc to any readable directory. Then, run:
 ```bdgm-play /path/to/directory```
 
