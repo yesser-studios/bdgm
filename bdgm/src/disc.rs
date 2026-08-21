@@ -176,7 +176,7 @@ pub fn write_simple_dir(
     let output_file = fs::File::create(output)?;
     let output = UdfWriter::create(output_file, root, options)?;
     println!(
-        "Wrote {} 2048-byte sectors, total size: {} b",
+        "Wrote {} 2048-byte sectors, total size: {} B",
         output.sectors_written,
         output.sectors_written as u64 * 2048
     );
