@@ -24,7 +24,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
         let args = Args::parse();
         println!("Playing {}", args.location.to_string_lossy());
 
-        let raw_disc = false;
+        let mut raw_disc = false;
         #[cfg(windows)]
         {
             raw_disc = args.raw_disc;
