@@ -24,8 +24,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
     let args = {
         let args = Args::parse();
         println!("Playing {}", args.location.to_string_lossy());
-
-        if args.image || args.raw_disc {
+        if args.image || (cfg!(windows) && args.raw_disc) {
             let file = if args.image {
                 File::open(&args.location)?
             } else {

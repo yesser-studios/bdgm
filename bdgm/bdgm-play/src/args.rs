@@ -15,5 +15,6 @@ pub(crate) struct Args {
 
     /// Whether the path points to a raw disc instead of a mount point.
     #[arg(long)]
+    #[cfg(windows)]
     pub raw_disc: bool,
 }

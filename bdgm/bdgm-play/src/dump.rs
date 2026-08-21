@@ -17,6 +17,7 @@ use windows_sys::Win32::{
 const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
 const SECTOR_SIZE: usize = 2048;
 
+#[cfg(windows)]
 fn disc_size(file: &File) -> io::Result<u64> {
     let mut capacity = STORAGE_READ_CAPACITY {
         Version: std::mem::size_of::<STORAGE_READ_CAPACITY>() as u32,
@@ -55,6 +56,7 @@ fn disc_size(file: &File) -> io::Result<u64> {
     Ok(capacity.DiskLength as u64)
 }
 
+#[cfg(windows)]
 pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     let mut drive = OpenOptions::new()
         .read(true)
