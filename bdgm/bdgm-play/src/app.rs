@@ -12,11 +12,10 @@ use fs_extra::dir::{self, CopyOptions};
 use hadris_udf::UdfVolume;
 use platform_dirs::AppDirs;
 
-use crate::{
-    args::Args,
-    dump::{dump_disc, extract_udf_dir},
-    error::AppError,
-};
+use crate::{args::Args, dump::extract_udf_dir, error::AppError};
+
+#[cfg(windows)]
+use crate::dump::dump_disc;
 
 pub(crate) fn run() -> anyhow::Result<()> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
@@ -24,17 +23,31 @@ pub(crate) fn run() -> anyhow::Result<()> {
     let args = {
         let args = Args::parse();
         println!("Playing {}", args.location.to_string_lossy());
-        if args.image || (cfg!(windows) && args.raw_disc) {
+
+        let raw_disc = false;
+        #[cfg(windows)]
+        {
+            raw_disc = args.raw_disc;
+        }
+
+        if args.image || raw_disc {
             let file = if args.image {
                 File::open(&args.location)?
             } else {
-                let dump_file = app_dirs.data_dir.join("dump.bin");
-                dump_disc(
-                    &args.location.to_string_lossy(),
-                    &dump_file.to_string_lossy(),
-                )?;
+                #[cfg(windows)]
+                {
+                    let dump_file = app_dirs.data_dir.join("dump.bin");
+                    dump_disc(
+                        &args.location.to_string_lossy(),
+                        &dump_file.to_string_lossy(),
+                    )?;
 
-                File::open(&dump_file)?
+                    File::open(&dump_file)?
+                }
+                #[cfg(not(windows))]
+                {
+                    File::open("")?
+                }
             };
 
             let udf = UdfVolume::open(file)?;
@@ -43,10 +56,20 @@ pub(crate) fn run() -> anyhow::Result<()> {
                 fs::remove_dir_all(&extract_dir)?;
             }
             extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir)?;
-            Args {
-                location: extract_dir,
-                image: false,
-                raw_disc: false,
+            #[cfg(windows)]
+            {
+                Args {
+                    location: extract_dir,
+                    image: false,
+                    raw_disc: false,
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                Args {
+                    location: extract_dir,
+                    image: false,
+                }
             }
         } else {
             args

@@ -1,11 +1,18 @@
+use hadris_udf::{UdfDir, UdfVolume};
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{self, Read, Write},
-    os::windows::{fs::OpenOptionsExt, io::AsRawHandle},
+    fs::{self, File},
     path::Path,
 };
 
-use hadris_udf::{UdfDir, UdfVolume};
+#[cfg(windows)]
+use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+#[cfg(windows)]
+use std::{
+    fs::OpenOptions,
+    io::{self, Read, Write},
+};
+
+#[cfg(windows)]
 use windows_sys::Win32::{
     Foundation::HANDLE,
     System::{
@@ -14,7 +21,9 @@ use windows_sys::Win32::{
     },
 };
 
+#[cfg(windows)]
 const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
+#[cfg(windows)]
 const SECTOR_SIZE: usize = 2048;
 
 #[cfg(windows)]
