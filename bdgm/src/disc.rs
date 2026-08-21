@@ -4,10 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use hadris_udf::{
-    UdfRevision,
-    write::{SimpleDir, SimpleFile, UdfWriteOptions, UdfWriter},
-};
+pub use hadris_udf::UdfRevision;
+use hadris_udf::write::{SimpleDir, SimpleFile, UdfWriteOptions, UdfWriter};
 
 use crate::{
     error::{BDGMError, EntryError},
@@ -92,7 +90,7 @@ impl Entry {
         }
     }
 
-    pub fn write_udf(&self, output: PathBuf) -> anyhow::Result<()> {
+    pub fn write_udf(&self, output: PathBuf, revision: UdfRevision) -> anyhow::Result<()> {
         match self {
             Entry::File { source: _, path: _ } => Err(EntryError::EntryIsFile.into()),
             Entry::Directory { path: _, children } => {
@@ -158,16 +156,21 @@ impl Entry {
                     })
                     .ok_or(BDGMError::ExecutableMissing)?;
 
-                write_simple_dir(&self.to_simple_dir()?, game.name, output)
+                write_simple_dir(&self.to_simple_dir()?, game.name, output, revision)
             }
         }
     }
 }
 
-pub fn write_simple_dir(root: &SimpleDir, name: String, output: PathBuf) -> anyhow::Result<()> {
+pub fn write_simple_dir(
+    root: &SimpleDir,
+    name: String,
+    output: PathBuf,
+    revision: UdfRevision,
+) -> anyhow::Result<()> {
     let options = UdfWriteOptions {
         volume_id: name,
-        revision: UdfRevision::V2_50,
+        revision: revision,
         ..UdfWriteOptions::default()
     };
 
@@ -179,11 +182,15 @@ pub fn write_simple_dir(root: &SimpleDir, name: String, output: PathBuf) -> anyh
 
 #[cfg(test)]
 mod test {
+    use hadris_udf::UdfRevision;
+
     use crate::disc::Entry;
 
     #[test]
     fn sample_dir_written() {
         let entry = Entry::scan_dir("../disc").unwrap();
-        entry.write_udf("./result.udf".into()).unwrap();
+        entry
+            .write_udf("./result.udf".into(), UdfRevision::V2_50)
+            .unwrap();
     }
 }
