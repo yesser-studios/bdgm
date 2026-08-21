@@ -83,8 +83,10 @@ dependencies = [
  "bdgm",
  "clap",
  "fs_extra",
+ "hadris-udf",
  "platform-dirs",
  "thiserror 2.0.20",
+ "windows-sys",
 ]
 
 [[package]]

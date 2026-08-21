@@ -1,15 +1,77 @@
-use std::{collections::HashMap, fs::File, io::Read, process::Command, string::String};
+use std::{
+    collections::HashMap,
+    fs::{self, File, OpenOptions},
+    io::Read,
+    os::windows::fs::OpenOptionsExt,
+    path::Path,
+    process::Command,
+    string::String,
+};
 
 use bdgm::{error::BDGMError, game::Game};
 use clap::Parser;
 use fs_extra::dir::{self, CopyOptions};
+use hadris_udf::{UdfDir, UdfVolume};
 use platform_dirs::AppDirs;
 
-use crate::{args::Args, error::AppError};
+use crate::{args::Args, dump::dump_disc, error::AppError};
+
+const FILE_FLAG_NO_BUFFERING: u32 = 0x2000_0000;
+
+fn extract_udf_dir(udf: &UdfVolume<File>, dir: &UdfDir, output_path: &Path) -> anyhow::Result<()> {
+    for entry in dir.entries() {
+        if entry.is_parent() {
+            continue;
+        }
+
+        let name = entry.name();
+        if entry.is_dir() {
+            let child_path = output_path.join(name);
+            fs::create_dir_all(&child_path)?;
+            let child = udf.read_directory(&entry.icb)?;
+            extract_udf_dir(udf, &child, &child_path)?;
+        } else {
+            let file_path = output_path.join(name);
+            let bytes = udf.read_file(entry)?;
+            fs::write(&file_path, bytes)?;
+        }
+    }
+
+    Ok(())
+}
 
 pub(crate) fn run() -> anyhow::Result<()> {
-    let args = Args::parse();
-    println!("Playing {}", args.location.to_string_lossy());
+    let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
+
+    let args = {
+        let args = Args::parse();
+        println!("Playing {}", args.location.to_string_lossy());
+
+        if args.image || args.raw_disc {
+            let file = if args.image {
+                File::open(&args.location)?
+            } else {
+                let dump_file = app_dirs.data_dir.join("dump.bin");
+                dump_disc(
+                    &args.location.to_string_lossy(),
+                    &dump_file.to_string_lossy(),
+                )?;
+
+                File::open(&dump_file)?
+            };
+
+            let udf = UdfVolume::open(file)?;
+            let extract_dir = app_dirs.data_dir.join("extract");
+            extract_udf_dir(&udf, &udf.root_dir()?, &extract_dir)?;
+            Args {
+                location: extract_dir,
+                image: false,
+                raw_disc: false,
+            }
+        } else {
+            args
+        }
+    };
 
     let manifest_path = args.location.join("BDGM").join("DISC.BDGM");
 
@@ -31,11 +93,9 @@ pub(crate) fn run() -> anyhow::Result<()> {
         return Err(BDGMError::ExecutableMissing.into());
     }
 
-    let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
     let game_dir = app_dirs.data_dir.join(&game.id);
     let cache_dir = app_dirs.cache_dir.join(&game.id);
     let data_dir = game_dir.join("data");
-
     let install_dir = game_dir.join("app").join(game.version);
 
     if !install_dir.try_exists()? {

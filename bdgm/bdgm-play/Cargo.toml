@@ -13,3 +13,9 @@ anyhow = "1"
 thiserror = "2"
 platform-dirs = "0.3"
 fs_extra = "1"
+hadris-udf = { version = "2.1.0" }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+] }
