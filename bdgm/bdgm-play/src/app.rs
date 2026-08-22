@@ -23,6 +23,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
         println!("Playing {}", args.location.to_string_lossy());
 
         #[allow(unused_assignments)]
+        #[allow(unused_mut)]
         let mut raw_disc = false;
         #[cfg(windows)]
         {

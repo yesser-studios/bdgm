@@ -1,7 +1,6 @@
 use hadris_udf::{UdfDir, UdfVolume};
 use std::{
     fs::{self, File},
-    io::{Seek, SeekFrom},
     path::Path,
 };
 
@@ -10,7 +9,7 @@ use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
 #[cfg(windows)]
 use std::{
     fs::OpenOptions,
-    io::{self, Read, Write},
+    io::{self, Read, Seek, SeekFrom, Write},
 };
 
 #[cfg(windows)]
