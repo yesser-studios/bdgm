@@ -57,6 +57,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
                     location: extract_dir.path().to_path_buf(),
                     image: false,
                     raw_disc: false,
+                    runtime: None,
                 }
             }
             #[cfg(not(windows))]
@@ -64,6 +65,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
                 Args {
                     location: extract_dir.path().to_path_buf(),
                     image: false,
+                    runtime: None,
                 }
             }
         } else {
@@ -115,9 +117,11 @@ pub(crate) fn run() -> anyhow::Result<()> {
     envvars.insert("BDGM_DISC", args.location.to_string_lossy().into_owned());
     envvars.insert("BDGM_VERSION", "1.0".to_string());
 
+    let runtime = args.runtime.map(|x| x.to_string_lossy().to_string());
+
     match game.runtime {
         bdgm::runtime::Runtime::Java => {
-            Command::new("java")
+            Command::new(runtime.as_deref().unwrap_or("java"))
                 .args(game.runtime_args)
                 .arg("--jar")
                 .arg(install_dir.join(game.executable))
@@ -128,7 +132,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
                 .status()?;
         }
         bdgm::runtime::Runtime::Dotnet => {
-            Command::new("dotnet")
+            Command::new(runtime.as_deref().unwrap_or("dotnet"))
                 .args(game.runtime_args)
                 .arg(install_dir.join(game.executable))
                 .arg("--")
@@ -138,7 +142,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
                 .status()?;
         }
         bdgm::runtime::Runtime::Python => {
-            Command::new("python")
+            Command::new(runtime.as_deref().unwrap_or("python"))
                 .args(game.runtime_args)
                 .arg(install_dir.join(game.executable))
                 .arg("--")
@@ -155,7 +159,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
                     .current_dir(&install_dir)
                     .status()?;
             } else {
-                Command::new("wine")
+                Command::new(runtime.as_deref().unwrap_or("wine"))
                     .args(game.runtime_args)
                     .arg(install_dir.join(game.executable))
                     .args(game.args)

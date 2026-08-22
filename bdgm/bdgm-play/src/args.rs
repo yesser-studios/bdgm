@@ -17,4 +17,8 @@ pub(crate) struct Args {
     #[arg(long)]
     #[cfg(windows)]
     pub raw_disc: bool,
+
+    /// The path to the runtime to use to run the game. Does nothing on Windows for Windows games.
+    #[arg(long)]
+    pub runtime: Option<PathBuf>,
 }
