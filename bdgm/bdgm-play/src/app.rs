@@ -119,45 +119,39 @@ pub(crate) fn run() -> anyhow::Result<()> {
 
     let runtime = args.runtime.map(|x| x.to_string_lossy().to_string());
 
-    match game.runtime {
-        bdgm::runtime::Runtime::Java => {
-            Command::new(runtime.as_deref().unwrap_or("java"))
-                .args(game.runtime_args)
-                .arg("--jar")
-                .arg(install_dir.join(game.executable))
-                .arg("--")
-                .args(game.args)
-                .envs(envvars)
-                .current_dir(&install_dir)
-                .status()?;
-        }
-        bdgm::runtime::Runtime::Dotnet => {
-            Command::new(runtime.as_deref().unwrap_or("dotnet"))
-                .args(game.runtime_args)
-                .arg(install_dir.join(game.executable))
-                .arg("--")
-                .args(game.args)
-                .envs(envvars)
-                .current_dir(&install_dir)
-                .status()?;
-        }
-        bdgm::runtime::Runtime::Python => {
-            Command::new(runtime.as_deref().unwrap_or("python"))
-                .args(game.runtime_args)
-                .arg(install_dir.join(game.executable))
-                .arg("--")
-                .args(game.args)
-                .envs(envvars)
-                .current_dir(&install_dir)
-                .status()?;
-        }
+    let status = match game.runtime {
+        bdgm::runtime::Runtime::Java => Command::new(runtime.as_deref().unwrap_or("java"))
+            .args(game.runtime_args)
+            .arg("--jar")
+            .arg(install_dir.join(game.executable))
+            .arg("--")
+            .args(game.args)
+            .envs(envvars)
+            .current_dir(&install_dir)
+            .status()?,
+        bdgm::runtime::Runtime::Dotnet => Command::new(runtime.as_deref().unwrap_or("dotnet"))
+            .args(game.runtime_args)
+            .arg(install_dir.join(game.executable))
+            .arg("--")
+            .args(game.args)
+            .envs(envvars)
+            .current_dir(&install_dir)
+            .status()?,
+        bdgm::runtime::Runtime::Python => Command::new(runtime.as_deref().unwrap_or("python"))
+            .args(game.runtime_args)
+            .arg(install_dir.join(game.executable))
+            .arg("--")
+            .args(game.args)
+            .envs(envvars)
+            .current_dir(&install_dir)
+            .status()?,
         bdgm::runtime::Runtime::Windows => {
             if cfg!(target_os = "windows") {
                 Command::new(install_dir.join(game.executable))
                     .args(game.args)
                     .envs(envvars)
                     .current_dir(&install_dir)
-                    .status()?;
+                    .status()?
             } else {
                 Command::new(runtime.as_deref().unwrap_or("wine"))
                     .args(game.runtime_args)
@@ -166,10 +160,14 @@ pub(crate) fn run() -> anyhow::Result<()> {
                     .envs(envvars)
                     .env("WINEPREFIX", game_dir.join("wineprefix"))
                     .current_dir(&install_dir)
-                    .status()?;
+                    .status()?
             }
         }
     };
+    if status.success() {
+        eprintln!("Your game crashed: {status}");
+        eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
+    }
 
     Ok(())
 }
