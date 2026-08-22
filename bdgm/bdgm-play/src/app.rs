@@ -165,7 +165,7 @@ pub(crate) fn run() -> anyhow::Result<()> {
             }
         }
     };
-    if status.success() {
+    if !status.success() {
         eprintln!("Your game crashed: {status}");
         eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
     }
