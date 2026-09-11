@@ -25,7 +25,7 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 - Unknown keys are ignored.
 - Discs with any missing mandatory key must be rejected.
 
-### BDGM/1.0
+### BDGM/1.1
 - Keys:
     - `name`: The name of the stored game, spaces included. Mandatory.
     - `id`: The unique identifier of the stored game in the period-separated kebab-case reverse domain notation. Mandatory.
@@ -34,8 +34,8 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
         - Separating different components in a larger piece of work within the ID is allowed, such as: `com.example.example-game.main-game`
         - Example: `com.example.my-game`.
     - `version`: The version of the stored game, in a text representation. Semantic versioning with major, minor and patch versions is suggested but not required. Mandatory.
-    - `runtime`: The runtime used to run the stored game. This is one of `java`, `dotnet`, `python`, `windows`. Other options may be added by future versions of the spec. Mandatory.
-    - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows`, otherwise mandatory.
+    - `runtime`: The runtime used to run the stored game. This is one of `java`, `dotnet`, `python`, `html`, `windows`. Other options may be added by future versions of the spec. Mandatory.
+    - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows` and ignored for `html`, otherwise mandatory.
     - `executable`: The path to the executable to run using the runtime. This is a path to the file relative to the BDGM/APP directory. Mandatory.
         - Absolute paths and `.` or `..` path components are forbidden. An initial `/` is forbidden.
         - The path must resolve to a regular file within `/BDGM/APP/` and must not resolve outside the directory.
@@ -62,6 +62,14 @@ The executable must function without internet access (it must not crash because 
     - The `.pyz` file must include all Python code and pure Python dependencies.
     - Native dependencies (such as `pygame`) must be included in the `APP/` directory for all supported platforms. These dependencies must be importable by normal Python import or any executable-defined loading mechanism.
     - If supplying dependencies with the above restrictions is unfeasible, you may use a bundler such as `pyinstaller` to make a self-contained x86_64 Windows binary and select the `windows` runtime and use a compatibility layer.
+- `html` - creates a local web server hosting the APP directory. The executable will be opened via the server in the user's default browser. `runtime_version`, `args` and `runtime_args` are ignored.
+    - The web server will run on a port randomly assigned to the game and saved for future plays, persisting data stored by the game in the browser.
+    - The executable must be a `.html` file.
+    - The executable must be runnable on a static server, and must function correctly offline.
+    - No data must be downloaded from a remote server.
+    - The environment vars and data folder will be inaccessible due to browser limitations, the executable must use persistent browser storage instead.
+    - The executable must not use cookies. It should use persistent browser storage to store data instead.
+    - If the executable stores data, it is required to run `navigator.storage.persist()` when data is saved.
 - `windows` - On Windows, executes the .exe file directly. Otherwise, uses Wine or a compatible Wine implementation. If specified, `runtime_version` is the minimum Windows compatibility target compatible with the game.
     - The executable must be built for x86_64.
     - On other architectures and OSes, a compatibility layer will be used if possible.
@@ -70,13 +78,19 @@ The game should access resources using a path relative to the running bundle/exe
 
 ## Player
 The player is an application installed on the user's operating system that reads the BDGM disc or image and runs the game. It may bundle common versions of runtimes.
-Whether bundled runtimes are used instead of user-installed ones depends on the player and/or user preference.
-The player must only use runtimes compatible with the major version specified in `DISC.BDGM`. A newer runtime may only be used if known to be compatible with the specified version.
-The player must create and provide a writable data and cache directory for the game. These must be different (though they may be nested).
-Each game's cache and data directories must be different. Different games must be identified via `id`.
-Different versions of games with the same `id` must use the same data directory.
-Cache directory may be emptied or replaced before running a game with a different version.
-If possible by the operating system, the player may provide write redirection to the data directory for games that write data into the installation or current working directory.
+- Whether bundled runtimes are used instead of user-installed ones depends on the player and/or user preference.
+- The player must only use runtimes compatible with the major version specified in `DISC.BDGM`. A newer runtime may only be used if known to be compatible with the specified version.
+- The player must create and provide a writable data and cache directory for the game. These must be different (though they may be nested).
+- Each game's cache and data directories must be different. Different games must be identified via `id`.
+- Different versions of games with the same `id` must use the same data directory.
+- Cache directory may be emptied or replaced before running a game with a different version.
+- If possible by the operating system, the player may provide write redirection to the data directory for games that write data into the installation or current working directory.
+- The player must persist `html` runtime server ports per-game. No two games may have the same port.
+- If the persistent port is unavailable, notify the user and refuse to serve the game. The player may let the user explicitly acknowledge that their data will be unavailable until the correct port is freed and that data saved on the fallback port may not be persisted.
+    - If the persisted port is unavailable and the user agrees, the player must temporarily use a fallback port. Future launches will use the persisted port once available.
+- The `html` runtime server must be bound to `127.0.0.1`.
+- The player must communicate to the user how to stop the `html` runtime server. This can be done, for example, via Ctrl-C, a custom keybind, or appropriate GUI.
+- The `html` runtime server must only expose files in the `APP` directory.
 
 The player must:
 1. Locate `/BDGM/DISC.BDGM`, and reject disc otherwise.
@@ -88,7 +102,8 @@ The player must:
 6. Set the CWD to the executable's directory.
 7. Set up directory redirection for games placing data in executable directory if possible and supported by the player.
 8. Set system envvars to the directories created by the player and set BDGM environment variables.
-9. Launch the game with arguments specified in `DISC.BDGM`.
+9. Start the web server for the `html` runtime.
+10. Launch the game with arguments specified in `DISC.BDGM`. For the `html` runtime, launch the game in the browser, ignoring the arguments specified in `DISC.BDGM`.
 
 ### Environment variables
 These environment variables must be provided by the players. Games may read these variables to get assets or save data.
@@ -96,6 +111,6 @@ These environment variables must be provided by the players. Games may read thes
 - `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running. The player must not delete it while the game is running.
 - `BDGM_APP`: The path to the `APP` directory, not the executable's directory.
 - `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
-- `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.0`)
+- `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.1`)
 - `WINEPREFIX`: Only if the game is `windows`; must be set to a writable location.
 Games must not assume these paths are on the same storage device.

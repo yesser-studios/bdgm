@@ -98,13 +98,9 @@ impl Entry {
                 children
                     .iter()
                     .find(|it| match it {
-                        Entry::Directory { path, children } => {
-                            if path == "BDGM" {
-                                bdgm_dir_children = children.to_vec();
-                                true
-                            } else {
-                                false
-                            }
+                        Entry::Directory { path, children } if path == "BDGM" => {
+                            bdgm_dir_children = children.to_vec();
+                            true
                         }
                         _ => false,
                     })
@@ -113,13 +109,9 @@ impl Entry {
                 bdgm_dir_children
                     .iter()
                     .find(|it| match it {
-                        Entry::File { source, path } => {
-                            if path == "DISC.BDGM" {
-                                manifest_path = source.to_path_buf();
-                                true
-                            } else {
-                                false
-                            }
+                        Entry::File { source, path } if path == "DISC.BDGM" => {
+                            manifest_path = source.to_path_buf();
+                            true
                         }
                         _ => false,
                     })
@@ -137,13 +129,9 @@ impl Entry {
                 bdgm_dir_children
                     .iter()
                     .find(|it| match it {
-                        Entry::Directory { path, children } => {
-                            if path == "APP" {
-                                app_dir_children = children.to_vec();
-                                true
-                            } else {
-                                false
-                            }
+                        Entry::Directory { path, children } if path == "APP" => {
+                            app_dir_children = children.to_vec();
+                            true
                         }
                         _ => false,
                     })
@@ -177,7 +165,7 @@ pub fn write_simple_dir(
 ) -> anyhow::Result<()> {
     let options = UdfWriteOptions {
         volume_id: name,
-        revision: revision,
+        revision,
         ..UdfWriteOptions::default()
     };
 

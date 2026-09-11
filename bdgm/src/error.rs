@@ -35,6 +35,8 @@ impl Display for EntryError {
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum BDGMError {
+    MissingHeaderVersion,
+    UnsupportedHeaderVersion(String),
     BDGMDirectoryMissing,
     DiscFileMissing,
     DiscFileInvalid,
@@ -51,6 +53,10 @@ pub enum BDGMError {
 impl Display for BDGMError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BDGMError::MissingHeaderVersion => write!(f, "The BDGM header is missing!"),
+            BDGMError::UnsupportedHeaderVersion(version) => {
+                write!(f, "BDGM spec version {version} is not supported")
+            }
             BDGMError::BDGMDirectoryMissing => write!(f, "The BDGM directory is missing!"),
             BDGMError::DiscFileMissing => write!(f, "The DISC.BDGM file is missing!"),
             BDGMError::DiscFileInvalid => write!(f, "The DISC.BDGM file is invalid!"),

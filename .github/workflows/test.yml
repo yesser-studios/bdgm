@@ -2,12 +2,15 @@ name: Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -18,10 +21,19 @@ jobs:
     runs-on: ${{matrix.os}}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-      working-directory: ./bdgm
-    - name: Run tests
-      run: cargo test --verbose
-      working-directory: ./bdgm
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build
+        run: cargo build --verbose
+        working-directory: ./bdgm
+      - name: Run tests
+        run: cargo test --verbose
+        working-directory: ./bdgm
+
+      - name: Build bdgm-play
+        run: cargo build
+        working-directory: ./bdgm/bdgm-play
+      - name: Build bdgm-build
+        run: cargo build
+        working-directory: ./bdgm/bdgm-build

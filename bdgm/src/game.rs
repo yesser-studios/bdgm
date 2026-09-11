@@ -15,6 +15,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Game {
+    pub bdgm_version: Option<String>,
     pub name: Option<String>,
     pub id: Option<String>,
     pub version: Option<String>,
@@ -28,6 +29,7 @@ pub struct Game {
 impl Game {
     fn new() -> Game {
         Game {
+            bdgm_version: None,
             name: None,
             id: None,
             version: None,
@@ -41,7 +43,9 @@ impl Game {
 
     pub fn to_string(&self) -> anyhow::Result<String> {
         let mut result = String::with_capacity(1024);
-        result.push_str("BDGM/1.0\n");
+        if let Some(bdgm_version) = &self.bdgm_version {
+            writeln!(result, "BDGM/{}", bdgm_version)?;
+        }
         if let Some(name) = &self.name {
             writeln!(result, "name={}", name)?
         };
@@ -77,11 +81,19 @@ impl Game {
         let mut result = Game::new();
 
         let mut lines = str.lines();
-        if let Some(header) = lines.next()
-            && !header.starts_with("BDGM/1.")
-        {
-            return Err(Error::from(ParserError::InvalidHeader));
-        }
+        result.bdgm_version = match lines.next() {
+            Some(header) => {
+                let split: Vec<_> = header.split('/').collect();
+                if split.len() != 2 || split.get(0).is_none_or(|x| *x != "BDGM") {
+                    return Err(Error::from(ParserError::InvalidHeader));
+                }
+                match split.get(1) {
+                    Some(x) => Some(x.to_string()),
+                    None => None,
+                }
+            }
+            None => None,
+        };
 
         for line in lines {
             if let Some(char) = line.chars().nth(0)
@@ -118,6 +130,7 @@ impl Game {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ValidatedGame {
+    bdgm_version: String,
     name: String,
     id: String,
     version: String,
@@ -138,9 +151,25 @@ impl IsNoneOrEmpty for Option<String> {
 }
 
 impl ValidatedGame {
+    pub fn get_supported_bdgm_versions() -> Vec<String> {
+        vec!["1.0".to_string(), "1.1".to_string()]
+    }
+
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
         let mut errors = BDGMErrors(Vec::new());
 
+        let bdgm_version = if game.bdgm_version.is_none_or_empty() {
+            errors.add(BDGMError::MissingHeaderVersion);
+            "".to_string()
+        } else {
+            let bdgm_version = game.bdgm_version.unwrap();
+            if !Self::get_supported_bdgm_versions().contains(&bdgm_version) {
+                errors.add(BDGMError::UnsupportedHeaderVersion(bdgm_version));
+                "".to_string()
+            } else {
+                bdgm_version
+            }
+        };
         let name = if game.name.is_none_or_empty() {
             errors.add(BDGMError::MandatoryFieldMissing("name".to_string()));
             "".to_string()
@@ -225,7 +254,10 @@ impl ValidatedGame {
         }
 
         if let Some(runtime) = &runtime {
-            if *runtime != Runtime::Windows && runtime_version.is_none() {
+            if *runtime != Runtime::Windows
+                && *runtime != Runtime::HTML
+                && runtime_version.is_none()
+            {
                 errors.add(BDGMError::MandatoryFieldMissing(
                     "runtime_version".to_string(),
                 ));
@@ -266,6 +298,7 @@ impl ValidatedGame {
         errors.evaluate()?;
 
         Ok(ValidatedGame {
+            bdgm_version,
             name,
             id,
             version,
@@ -275,6 +308,10 @@ impl ValidatedGame {
             runtime_version,
             runtime_args,
         })
+    }
+
+    pub fn bdgm_version(&self) -> &str {
+        &self.bdgm_version
     }
 
     pub fn name(&self) -> &str {
@@ -320,6 +357,7 @@ impl ValidatedGame {
 impl From<ValidatedGame> for Game {
     fn from(value: ValidatedGame) -> Self {
         Game {
+            bdgm_version: Some(value.bdgm_version),
             name: Some(value.name),
             id: Some(value.id),
             version: Some(value.version),
@@ -343,6 +381,7 @@ mod test {
     #[test]
     fn game_serializes() {
         let game = Game {
+            bdgm_version: Some("1.1".to_string()),
             name: Some("test".to_string()),
             id: Some("com.example.test".to_string()),
             version: Some("1.0.0".to_string()),
@@ -377,6 +416,7 @@ mod test {
     #[test]
     fn game_validates() {
         let game = Game {
+            bdgm_version: Some("1.1".to_string()),
             name: Some("test".to_string()),
             id: Some("com.example.test".to_string()),
             version: Some("1.0.0".to_string()),
