@@ -4,9 +4,11 @@ mod app;
 mod args;
 mod dump;
 mod error;
+mod server;
 
-fn main() {
-    match run() {
+#[tokio::main]
+async fn main() {
+    match run().await {
         Ok(_) => {}
         Err(e) => eprintln!("{e}"),
     }

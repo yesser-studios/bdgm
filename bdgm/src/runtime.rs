@@ -12,6 +12,8 @@ pub enum Runtime {
     Python,
     #[serde(rename = "windows")]
     Windows,
+    #[serde(rename = "html")]
+    HTML,
 }
 
 impl Display for Runtime {
@@ -21,6 +23,7 @@ impl Display for Runtime {
             Runtime::Dotnet => write!(f, "dotnet"),
             Runtime::Python => write!(f, "python"),
             Runtime::Windows => write!(f, "windows"),
+            Runtime::HTML => write!(f, "html"),
         }
     }
 }
@@ -32,17 +35,19 @@ impl Runtime {
             "dotnet" => Some(Self::Dotnet),
             "python" => Some(Self::Python),
             "windows" => Some(Self::Windows),
+            "html" => Some(Self::HTML),
             _ => None,
         }
     }
 
     pub fn display_all() -> String {
         format!(
-            "{}, {}, {}, {}",
+            "{}, {}, {}, {}, {}",
             Self::Java,
             Self::Dotnet,
             Self::Python,
-            Self::Windows
+            Self::Windows,
+            Self::HTML,
         )
     }
 }
