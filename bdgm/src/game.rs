@@ -287,11 +287,7 @@ impl ValidatedGame {
             writeln!(result, "runtime_version={}", runtime_version)?;
         }
 
-        writeln!(
-            result,
-            "args={}",
-            serde_json::ser::to_string(&self.runtime_args)?
-        )?;
+        writeln!(result, "args={}", serde_json::ser::to_string(&self.args)?)?;
         writeln!(
             result,
             "runtime_args={}",
