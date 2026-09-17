@@ -12,6 +12,7 @@ use crate::{
     game::{Game, ValidatedGame},
 };
 
+/// A single filesystem file or directory entry.
 #[derive(Debug, Clone)]
 pub enum Entry {
     File { source: PathBuf, path: PathBuf },
@@ -19,6 +20,7 @@ pub enum Entry {
 }
 
 impl Entry {
+    /// Scans a directory and returns an `Entry` of the root directory, including all descendants.
     pub fn scan_dir(root: impl AsRef<Path>) -> anyhow::Result<Entry> {
         let root = root.as_ref();
         let mut children: Vec<Entry> = Vec::new();
@@ -45,6 +47,7 @@ impl Entry {
         })
     }
 
+    /// Scans a single file or directory and creates an `Entry` containing all children
     fn scan_entry(source: &Path, path: PathBuf) -> io::Result<Entry> {
         if source.is_dir() {
             let mut children = Vec::new();
@@ -67,6 +70,7 @@ impl Entry {
         }
     }
 
+    /// Creates a `hadris_udf::sync::SimpleDir` from a directory `Entry`.
     pub fn to_simple_dir(&self) -> anyhow::Result<SimpleDir> {
         match self {
             Entry::File { source: _, path: _ } => Result::Err(EntryError::EntryIsFile.into()),
@@ -90,6 +94,7 @@ impl Entry {
         }
     }
 
+    /// Writes a directory `Entry` including its children into a UDF image file.
     pub fn write_udf(&self, output: PathBuf, revision: UdfRevision) -> anyhow::Result<()> {
         match self {
             Entry::File { source: _, path: _ } => Err(EntryError::EntryIsFile.into()),
@@ -157,6 +162,7 @@ impl Entry {
     }
 }
 
+/// Writes a `hadris_udf::sync::SimpleDir` into a UDF image file.
 pub fn write_simple_dir(
     root: &SimpleDir,
     name: String,

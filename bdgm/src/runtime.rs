@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
+/// An enum of runtimes supported by the library. This must match all runtimes of the latest
+/// supported version of the spec. (see `ValidatedGame.get_supported_bdgm_versions`)
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Runtime {
     #[serde(rename = "java")]
@@ -29,6 +31,7 @@ impl Display for Runtime {
 }
 
 impl Runtime {
+    /// Creates a `Runtime` from the value of the `runtime` field of `DISC.BDGM`.
     pub fn from_str(str: &str) -> Option<Self> {
         match str {
             "java" => Some(Self::Java),
@@ -40,6 +43,7 @@ impl Runtime {
         }
     }
 
+    /// Formats all runtimes as a comma-separated `String` of `DISC.BDGM` `runtime` field values.
     pub fn display_all() -> String {
         format!(
             "{}, {}, {}, {}, {}",
