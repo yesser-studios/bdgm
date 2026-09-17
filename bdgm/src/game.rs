@@ -41,44 +41,6 @@ impl Game {
         }
     }
 
-    /// Deprecated. Use `ValidatedGame.to_string` instead.
-    #[deprecated]
-    pub fn to_string(&self) -> anyhow::Result<String> {
-        let mut result = String::with_capacity(1024);
-        if let Some(bdgm_version) = &self.bdgm_version {
-            writeln!(result, "BDGM/{}", bdgm_version)?;
-        }
-        if let Some(name) = &self.name {
-            writeln!(result, "name={}", name)?
-        };
-        if let Some(id) = &self.id {
-            writeln!(result, "id={}", id)?;
-        }
-        if let Some(version) = &self.version {
-            writeln!(result, "version={}", version)?;
-        }
-        if let Some(executable) = &self.executable {
-            writeln!(result, "executable={}", executable)?;
-        }
-        writeln!(
-            result,
-            "args={}",
-            serde_json::ser::to_string(&self.runtime_args)?
-        )?;
-        if let Some(runtime) = &self.runtime {
-            writeln!(result, "runtime={}", runtime)?;
-        }
-        if let Some(runtime_version) = &self.runtime_version {
-            writeln!(result, "runtime_version={}", runtime_version)?;
-        }
-        writeln!(
-            result,
-            "runtime_args={}",
-            serde_json::ser::to_string(&self.runtime_args)?
-        )?;
-        Ok(result)
-    }
-
     pub fn from_str(str: &str) -> anyhow::Result<Game> {
         let mut result = Game::new();
 
@@ -420,13 +382,8 @@ mod test {
             runtime_args: Vec::new(),
         };
 
-        #[allow(deprecated)]
-        let result = game.to_string().unwrap();
-        let mut file = File::create("./DISC_write.BDGM").unwrap();
-        write!(file, "{result}").unwrap();
-
         let result = ValidatedGame::validate(game).unwrap().to_string().unwrap();
-        let mut file = File::create("./DISC_write_2.BDGM").unwrap();
+        let mut file = File::create("./DISC_write.BDGM").unwrap();
         write!(file, "{result}").unwrap();
     }
 
