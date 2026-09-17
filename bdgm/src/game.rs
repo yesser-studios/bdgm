@@ -13,6 +13,8 @@ use crate::{
     runtime::Runtime,
 };
 
+/// Raw game struct. Used for parsing DISC.BDGM files using `from_str`.
+/// Use `ValidatedGame::validate` to validate and use `ValidatedGame`-provided getters.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Game {
     pub bdgm_version: Option<String>,
@@ -27,6 +29,7 @@ pub struct Game {
 }
 
 impl Game {
+    /// Creates a new empty Game. This is not valid by default as fields need to be populated.
     fn new() -> Game {
         Game {
             bdgm_version: None,
@@ -41,6 +44,7 @@ impl Game {
         }
     }
 
+    /// Parses a `Game` from `DISC.BDGM` file contents.
     pub fn from_str(str: &str) -> anyhow::Result<Game> {
         let mut result = Game::new();
 
@@ -92,6 +96,8 @@ impl Game {
     }
 }
 
+/// `ValidatedGame` provides compile-time guarantees that the game is valid. Use the `validate`
+/// constructor to validate a raw `Game` and get a `ValidatedGame`.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ValidatedGame {
     bdgm_version: String,
@@ -115,10 +121,13 @@ impl IsNoneOrEmpty for Option<String> {
 }
 
 impl ValidatedGame {
+    /// Gets a `Vec` of supported BDGM spec versions by this library.
     pub fn get_supported_bdgm_versions() -> Vec<String> {
         vec!["1.0".to_string(), "1.1".to_string()]
     }
 
+    /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
+    /// errors.
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
         let mut errors = BDGMErrors(Vec::new());
 
@@ -274,6 +283,7 @@ impl ValidatedGame {
         })
     }
 
+    /// Converts `ValidatedGame` into a valid `DISC.BDGM` string.
     pub fn to_string(&self) -> anyhow::Result<String> {
         let mut result = String::with_capacity(1024);
         writeln!(result, "BDGM/{}", self.bdgm_version)?;

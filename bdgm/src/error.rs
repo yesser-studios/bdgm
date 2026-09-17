@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::runtime::Runtime;
 
+/// Represents a single parser error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParserError {
     InvalidHeader,
@@ -33,6 +34,7 @@ impl Display for EntryError {
     }
 }
 
+/// Represents a single BDGM validation error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum BDGMError {
     MissingHeaderVersion,
@@ -91,14 +93,17 @@ impl Display for BDGMError {
     }
 }
 
+/// A set of BDGM validation errors.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct BDGMErrors(pub Vec<BDGMError>);
 
 impl BDGMErrors {
+    /// Adds a `BDGMError` to the current list.
     pub fn add(&mut self, error: BDGMError) {
         self.0.push(error);
     }
 
+    /// Returns `Ok` if the set contains no errors, otherwise returns `Err(self)`.
     pub fn evaluate(self) -> Result<(), Self> {
         if self.0.len() > 0 { Err(self) } else { Ok(()) }
     }
@@ -114,6 +119,7 @@ impl Display for BDGMErrors {
     }
 }
 
+/// Represents a single ID format validation error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum IdFormatError {
     ContainsUppercase,
@@ -155,6 +161,7 @@ impl Display for IdFormatError {
     }
 }
 
+/// Represents a single executable validation error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ExecutableError {
     #[error("The path is absolute. Only paths relative to DISC.BDGM can be used.")]
