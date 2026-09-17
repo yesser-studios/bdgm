@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Raw game struct. Used for parsing DISC.BDGM files using `from_str`.
-/// Use `ValidatedGame.validate` to validate and use `ValidatedGame`-provided getters.
+/// Use `ValidatedGame::validate` to validate and use `ValidatedGame`-provided getters.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Game {
     pub bdgm_version: Option<String>,
@@ -126,7 +126,7 @@ impl ValidatedGame {
         vec!["1.0".to_string(), "1.1".to_string()]
     }
 
-    /// Validates a `Raw` game and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
+    /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
     /// errors.
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
         let mut errors = BDGMErrors(Vec::new());

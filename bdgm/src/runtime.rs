@@ -3,7 +3,7 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 /// An enum of runtimes supported by the library. This must match all runtimes of the latest
-/// supported version of the spec. (see `ValidatedGame.get_supported_bdgm_versions`)
+/// supported version of the spec. (see `ValidatedGame::get_supported_bdgm_versions`)
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Runtime {
     #[serde(rename = "java")]
