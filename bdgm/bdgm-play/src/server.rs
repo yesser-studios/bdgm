@@ -81,6 +81,9 @@ pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathB
     temp_file.sync_all()?;
     drop(temp_file);
 
+    #[cfg(unix)]
+    File::open(data_dir)?.sync_all()?;
+
     fs::rename(&temp_path, &path)?;
     drop(file);
 
