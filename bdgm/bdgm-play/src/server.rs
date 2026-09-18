@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
 };
@@ -29,15 +29,25 @@ pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<(
     Ok(())
 }
 
-pub(crate) fn get_portlist_file(data_dir: &PathBuf) -> Result<File> {
-    let path = data_dir.join("ports.json");
-    let file = File::options()
+const PORTLIST_FILE_NAME: &'static str = "ports.json";
+
+pub(crate) fn get_file(path: &PathBuf) -> Result<File> {
+    Ok(File::options()
         .write(true)
         .read(true)
         .create(true)
-        .open(path)?;
+        .open(path)?)
+}
+
+pub(crate) fn acquire_portlist_lock(data_dir: &PathBuf) -> Result<File> {
+    let path = get_portlist_file_path(data_dir).with_added_extension("lock");
+    let file = get_file(&path)?;
     file.lock()?;
     Ok(file)
+}
+
+pub(crate) fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
+    data_dir.join(PORTLIST_FILE_NAME)
 }
 
 pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
@@ -58,10 +68,34 @@ pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     }
 }
 
-pub(crate) fn save_ports(ports: BiMap<String, u16>, file: &mut File) -> Result<()> {
-    let json = serde_json::to_string_pretty(&ports)?;
+fn truncate(file: &mut File) -> Result<()> {
     file.set_len(0)?;
     file.seek(SeekFrom::Start(0))?;
-    write!(file, "{json}")?;
+
+    Ok(())
+}
+
+pub(crate) fn save_ports(
+    ports: BiMap<String, u16>,
+    lock_file: File,
+    data_dir: &PathBuf,
+) -> Result<()> {
+    let json = serde_json::to_string_pretty(&ports)?;
+
+    let path = get_portlist_file_path(data_dir);
+    let temp_path = path.with_added_extension("tmp");
+    let mut temp_file = get_file(&temp_path)?;
+    truncate(&mut temp_file)?;
+    temp_file.write_all(json.as_bytes())?;
+    temp_file.sync_all()?;
+    drop(temp_file);
+
+    fs::rename(&temp_path, &path)?;
+
+    #[cfg(unix)]
+    File::open(data_dir)?.sync_all()?;
+
+    drop(lock_file);
+
     Ok(())
 }

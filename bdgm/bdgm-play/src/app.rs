@@ -15,7 +15,10 @@ use crate::{
     args::Args,
     dump::extract_udf_dir,
     error::AppError,
-    server::{create_listener, get_portlist_file, load_ports, save_ports, serve},
+    server::{
+        acquire_portlist_lock, create_listener, get_file, get_portlist_file_path, load_ports,
+        save_ports, serve,
+    },
 };
 
 #[cfg(windows)]
@@ -164,12 +167,17 @@ pub(crate) async fn run() -> anyhow::Result<()> {
             .status()?,
         bdgm::runtime::Runtime::HTML => {
             println!("Reading saved ports...");
-            let mut file = get_portlist_file(&app_dirs.data_dir)?;
+            let lock = acquire_portlist_lock(&app_dirs.data_dir)?;
+            let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
             let mut ports = load_ports(&mut file)?;
             let port = ports.get_by_left(game.id());
 
             let listener = match port {
-                Some(port) => create_listener(Some(*port)).await?,
+                Some(port) => {
+                    drop(file);
+                    drop(lock);
+                    create_listener(Some(*port)).await?
+                }
                 None => {
                     let mut listener = create_listener(None).await?;
                     let mut port = listener.local_addr()?.port();
@@ -187,7 +195,8 @@ pub(crate) async fn run() -> anyhow::Result<()> {
 
                     ports.insert(game.id().to_string(), listener.local_addr()?.port());
                     println!("Persisting port {}...", listener.local_addr()?.port());
-                    save_ports(ports, &mut file)?;
+                    drop(file);
+                    save_ports(ports, lock, &app_dirs.data_dir)?;
                     listener
                 }
             };
@@ -199,7 +208,6 @@ pub(crate) async fn run() -> anyhow::Result<()> {
             println!("Opening {address}");
             webbrowser::open(&address)?;
 
-            drop(file);
             println!("Running server, press Ctrl + C to stop.");
             serve(listener, install_dir).await?;
 
