@@ -31,16 +31,18 @@ pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<(
 
 const PORTLIST_FILE_NAME: &'static str = "ports.json";
 
-pub(crate) fn get_file(path: &PathBuf, lock: bool) -> Result<File> {
-    let file = File::options()
+pub(crate) fn get_file(path: &PathBuf) -> Result<File> {
+    Ok(File::options()
         .write(true)
         .read(true)
         .create(true)
-        .open(path)?;
-    if lock {
-        file.lock()?;
-    }
+        .open(path)?)
+}
 
+pub(crate) fn acquire_portlist_lock(data_dir: &PathBuf) -> Result<File> {
+    let path = get_portlist_file_path(data_dir).with_added_extension("lock");
+    let file = get_file(&path)?;
+    file.lock()?;
     Ok(file)
 }
 
@@ -73,12 +75,16 @@ fn truncate(file: &mut File) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathBuf) -> Result<()> {
+pub(crate) fn save_ports(
+    ports: BiMap<String, u16>,
+    lock_file: File,
+    data_dir: &PathBuf,
+) -> Result<()> {
     let json = serde_json::to_string_pretty(&ports)?;
 
     let path = get_portlist_file_path(data_dir);
     let temp_path = path.with_added_extension("tmp");
-    let mut temp_file = get_file(&temp_path, false)?;
+    let mut temp_file = get_file(&temp_path)?;
     truncate(&mut temp_file)?;
     temp_file.write_all(json.as_bytes())?;
     temp_file.sync_all()?;
@@ -88,7 +94,7 @@ pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathB
     File::open(data_dir)?.sync_all()?;
 
     fs::rename(&temp_path, &path)?;
-    drop(file);
+    drop(lock_file);
 
     Ok(())
 }
