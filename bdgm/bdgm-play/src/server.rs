@@ -90,10 +90,11 @@ pub(crate) fn save_ports(
     temp_file.sync_all()?;
     drop(temp_file);
 
+    fs::rename(&temp_path, &path)?;
+
     #[cfg(unix)]
     File::open(data_dir)?.sync_all()?;
 
-    fs::rename(&temp_path, &path)?;
     drop(lock_file);
 
     Ok(())
