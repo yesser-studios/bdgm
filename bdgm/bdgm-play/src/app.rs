@@ -169,7 +169,10 @@ pub(crate) async fn run() -> anyhow::Result<()> {
             let port = ports.get_by_left(game.id());
 
             let listener = match port {
-                Some(port) => create_listener(Some(*port)).await?,
+                Some(port) => {
+                    drop(file);
+                    create_listener(Some(*port)).await?
+                }
                 None => {
                     let mut listener = create_listener(None).await?;
                     let mut port = listener.local_addr()?.port();
