@@ -1,6 +1,6 @@
 use std::{
-    fs::File,
-    io::{Read, Seek, SeekFrom, Write},
+    fs::{self, File},
+    io::{Read, Write},
     path::PathBuf,
 };
 
@@ -29,8 +29,9 @@ pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<(
     Ok(())
 }
 
-pub(crate) fn get_portlist_file(data_dir: &PathBuf) -> Result<File> {
-    let path = data_dir.join("ports.json");
+const PORTLIST_FILE_NAME: &'static str = "ports.json";
+
+pub(crate) fn get_file(path: &PathBuf) -> Result<File> {
     let file = File::options()
         .write(true)
         .read(true)
@@ -38,6 +39,10 @@ pub(crate) fn get_portlist_file(data_dir: &PathBuf) -> Result<File> {
         .open(path)?;
     file.lock()?;
     Ok(file)
+}
+
+pub(crate) fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
+    data_dir.join(PORTLIST_FILE_NAME)
 }
 
 pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
@@ -58,10 +63,18 @@ pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     }
 }
 
-pub(crate) fn save_ports(ports: BiMap<String, u16>, file: &mut File) -> Result<()> {
+pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathBuf) -> Result<()> {
     let json = serde_json::to_string_pretty(&ports)?;
-    file.set_len(0)?;
-    file.seek(SeekFrom::Start(0))?;
-    write!(file, "{json}")?;
+
+    let path = get_portlist_file_path(data_dir);
+    let temp_path = path.with_added_extension("tmp");
+    let mut temp_file = get_file(&temp_path)?;
+    temp_file.write_all(json.as_bytes())?;
+    temp_file.sync_all()?;
+    drop(temp_file);
+
+    fs::rename(&temp_path, &path)?;
+    drop(file);
+
     Ok(())
 }
