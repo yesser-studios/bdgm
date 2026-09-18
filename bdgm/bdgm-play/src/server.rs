@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
 };
 
@@ -63,12 +63,20 @@ pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     }
 }
 
+fn truncate(file: &mut File) -> Result<()> {
+    file.set_len(0)?;
+    file.seek(SeekFrom::Start(0))?;
+
+    Ok(())
+}
+
 pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathBuf) -> Result<()> {
     let json = serde_json::to_string_pretty(&ports)?;
 
     let path = get_portlist_file_path(data_dir);
     let temp_path = path.with_added_extension("tmp");
     let mut temp_file = get_file(&temp_path)?;
+    truncate(&mut temp_file)?;
     temp_file.write_all(json.as_bytes())?;
     temp_file.sync_all()?;
     drop(temp_file);
