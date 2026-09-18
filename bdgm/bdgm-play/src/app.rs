@@ -164,7 +164,7 @@ pub(crate) async fn run() -> anyhow::Result<()> {
             .status()?,
         bdgm::runtime::Runtime::HTML => {
             println!("Reading saved ports...");
-            let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
+            let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir), true)?;
             let mut ports = load_ports(&mut file)?;
             let port = ports.get_by_left(game.id());
 

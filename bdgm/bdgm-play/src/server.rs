@@ -31,13 +31,16 @@ pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<(
 
 const PORTLIST_FILE_NAME: &'static str = "ports.json";
 
-pub(crate) fn get_file(path: &PathBuf) -> Result<File> {
+pub(crate) fn get_file(path: &PathBuf, lock: bool) -> Result<File> {
     let file = File::options()
         .write(true)
         .read(true)
         .create(true)
         .open(path)?;
-    file.lock()?;
+    if lock {
+        file.lock()?;
+    }
+
     Ok(file)
 }
 
@@ -75,7 +78,7 @@ pub(crate) fn save_ports(ports: BiMap<String, u16>, file: File, data_dir: &PathB
 
     let path = get_portlist_file_path(data_dir);
     let temp_path = path.with_added_extension("tmp");
-    let mut temp_file = get_file(&temp_path)?;
+    let mut temp_file = get_file(&temp_path, false)?;
     truncate(&mut temp_file)?;
     temp_file.write_all(json.as_bytes())?;
     temp_file.sync_all()?;
