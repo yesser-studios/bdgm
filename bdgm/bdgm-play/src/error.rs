@@ -4,7 +4,7 @@ use bdgm::error::BDGMError;
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
-pub(crate) enum AppError {
+pub enum AppError {
     NoAppDirs,
     InvalidGameFile(BDGMError),
     CouldNotFindUnclaimedPort,

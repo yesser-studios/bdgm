@@ -5,7 +5,7 @@ use clap::Parser;
 /// BDGM disc image builder
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-pub(crate) struct Args {
+pub struct Args {
     /// The mounted root of the game disc. This is the parent of the BDGM directory.
     pub location: PathBuf,
 
@@ -21,4 +21,36 @@ pub(crate) struct Args {
     /// The path to the runtime to use to run the game. Does nothing on Windows for Windows games.
     #[arg(long)]
     pub runtime: Option<PathBuf>,
+}
+
+impl Args {
+    pub fn new_imageless(location: PathBuf, runtime: Option<PathBuf>) -> Self {
+        #[cfg(windows)]
+        {
+            Args {
+                location,
+                image: false,
+                raw_disc: false,
+                runtime,
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            Args {
+                location,
+                image: false,
+                runtime,
+            }
+        }
+    }
+
+    pub fn is_raw_disc(&self) -> bool {
+        #[cfg(windows)]
+        {
+            return self.raw_disc;
+        }
+
+        #[allow(unreachable_code)]
+        false
+    }
 }

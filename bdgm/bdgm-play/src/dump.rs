@@ -118,7 +118,7 @@ fn disc_size(file: &File) -> io::Result<u64> {
 }
 
 #[cfg(windows)]
-pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
+pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     let mut drive = OpenOptions::new()
         .read(true)
         .custom_flags(FILE_FLAG_NO_BUFFERING)
@@ -178,7 +178,7 @@ pub(crate) fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn extract_udf_dir(
+pub fn extract_udf_dir(
     udf: &UdfVolume<File>,
     dir: &UdfDir,
     output_path: &Path,
