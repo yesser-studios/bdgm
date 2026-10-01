@@ -74,7 +74,7 @@ pub async fn launch_game(
             .current_dir(&game_dirs.install)
             .status()?,
         bdgm::runtime::Runtime::HTML => {
-            play_html_game(&game, &game_dirs.install, &game_dirs.data, verbose).await?;
+            play_html_game(&game, &game_dirs.install, app_dirs, verbose).await?;
             std::process::ExitStatus::default()
         }
         bdgm::runtime::Runtime::Windows => {

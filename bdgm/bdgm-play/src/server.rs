@@ -9,6 +9,7 @@ use axum::Router;
 use bdgm::game::ValidatedGame;
 use bimap::BiMap;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+use platform_dirs::AppDirs;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
@@ -103,11 +104,11 @@ pub fn save_ports(ports: BiMap<String, u16>, lock_file: File, data_dir: &PathBuf
 pub async fn play_html_game(
     game: &ValidatedGame,
     install_dir: &PathBuf,
-    data_dir: &PathBuf,
+    app_dirs: &AppDirs,
     verbose: bool,
 ) -> anyhow::Result<()> {
-    let lock = acquire_portlist_lock(data_dir)?;
-    let mut file = get_file(&get_portlist_file_path(data_dir))?;
+    let lock = acquire_portlist_lock(&app_dirs.data_dir)?;
+    let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
     let mut ports = load_ports(&mut file)?;
     let port = ports.get_by_left(game.id());
 
@@ -137,7 +138,7 @@ pub async fn play_html_game(
                 println!("Persisting port {}...", listener.local_addr()?.port());
             }
             drop(file);
-            save_ports(ports, lock, data_dir)?;
+            save_ports(ports, lock, &app_dirs.data_dir)?;
             listener
         }
     };
