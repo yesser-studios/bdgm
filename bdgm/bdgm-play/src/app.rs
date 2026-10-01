@@ -1,3 +1,4 @@
+use std::process::ExitStatus;
 
 use bdgm::game::{Game, ValidatedGame};
 use bdgm_play::{
@@ -7,7 +8,7 @@ use bdgm_play::{
 use clap::Parser;
 use platform_dirs::AppDirs;
 
-pub(crate) async fn run() -> anyhow::Result<()> {
+pub(crate) async fn run() -> anyhow::Result<ExitStatus> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
 
     let args = Args::parse();
@@ -22,7 +23,7 @@ pub(crate) async fn run() -> anyhow::Result<()> {
     install(&game, &app_dirs, &args)?;
 
     println!("Launching...");
-    launch_game(&game, &args, &app_dirs, true).await?;
+    let status = launch_game(&game, &args, &app_dirs, true).await?;
 
-    Ok(())
+    Ok(status)
 }
