@@ -1,7 +1,7 @@
 use std::fs::File;
 
 use hadris_udf::UdfVolume;
-use tempfile::tempdir;
+use tempfile::{TempDir, tempdir};
 
 use crate::{args::Args, dump::extract_udf_dir};
 
@@ -31,11 +31,11 @@ impl ImageState {
     }
 }
 
-pub fn resolve_image_args(args: Args) -> anyhow::Result<Args> {
+pub fn resolve_image_args(args: Args) -> anyhow::Result<(Args, Option<TempDir>)> {
     let image_state = ImageState::from(&args);
 
     let file = match image_state {
-        ImageState::MountedDirectory => return Ok(args),
+        ImageState::MountedDirectory => return Ok((args, None)),
         ImageState::Image => File::open(&args.location)?,
         #[cfg(windows)]
         ImageState::RawDisc => {
@@ -53,8 +53,8 @@ pub fn resolve_image_args(args: Args) -> anyhow::Result<Args> {
     let udf = UdfVolume::open(file)?;
     extract_udf_dir(&udf, &udf.root_dir()?, extract_dir.path())?;
 
-    Ok(Args::new_imageless(
-        extract_dir.path().to_path_buf(),
-        args.runtime,
+    Ok((
+        Args::new_imageless(extract_dir.path().to_path_buf(), args.runtime),
+        Some(extract_dir),
     ))
 }

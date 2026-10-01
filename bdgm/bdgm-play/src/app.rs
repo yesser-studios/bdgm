@@ -12,7 +12,7 @@ pub(crate) async fn run() -> anyhow::Result<ExitStatus> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
 
     let args = Args::parse();
-    let args = resolve_image_args(args)?;
+    let (args, tempdir) = resolve_image_args(args)?;
 
     let manifest = read_manifest(&args)?;
 
@@ -24,6 +24,7 @@ pub(crate) async fn run() -> anyhow::Result<ExitStatus> {
 
     println!("Launching...");
     let status = launch_game(&game, &args, &app_dirs, true).await?;
+    drop(tempdir);
 
     Ok(status)
 }
