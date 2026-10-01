@@ -8,6 +8,9 @@ async fn main() {
         Ok(status) => {
             if let Some(code) = status.code() {
                 std::process::exit(code);
+            } else if !status.success() {
+                // For example on SIGKILL
+                std::process::exit(1);
             }
         }
         Err(e) => {
