@@ -53,7 +53,7 @@ pub async fn launch_game(
     let status = match runtime {
         bdgm::runtime::Runtime::Java => Command::new(runtime_path.as_deref().unwrap_or("java"))
             .args(game.runtime_args())
-            .arg("--jar")
+            .arg("-jar")
             .arg(game_dirs.install.join(game.executable()))
             .args(game.args())
             .envs(envvars)
