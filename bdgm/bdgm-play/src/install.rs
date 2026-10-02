@@ -10,7 +10,7 @@ pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow:
     let id = game.id();
     let game_dir = app_dirs.data_dir.join(&id);
     let install_dir = game_dir.join("app").join(game.version());
-    let install_part_dir = game_dir.with_added_extension("part");
+    let install_part_dir = install_dir.with_added_extension("part");
     if !install_dir.try_exists()? {
         let lock = acquire_lock(&install_dir).map_err(|_| {
             io::Error::new(
