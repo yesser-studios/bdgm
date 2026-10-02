@@ -5,6 +5,7 @@ pub mod args;
 pub mod dirs;
 pub mod dump;
 pub mod error;
+pub mod fs;
 pub mod image;
 pub mod install;
 pub mod launch;

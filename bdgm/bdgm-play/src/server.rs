@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Write},
     path::PathBuf,
 };
 
@@ -13,7 +13,10 @@ use platform_dirs::AppDirs;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
-use crate::error::AppError;
+use crate::{
+    error::AppError,
+    fs::{acquire_lock, get_file, get_part_file, truncate},
+};
 
 pub async fn create_listener(port: Option<u16>) -> Result<TcpListener> {
     match port {
@@ -35,21 +38,6 @@ pub async fn serve(listener: TcpListener, directory: &PathBuf) -> Result<()> {
 }
 
 const PORTLIST_FILE_NAME: &'static str = "ports.json";
-
-pub fn get_file(path: &PathBuf) -> Result<File> {
-    Ok(File::options()
-        .write(true)
-        .read(true)
-        .create(true)
-        .open(path)?)
-}
-
-pub fn acquire_portlist_lock(data_dir: &PathBuf) -> Result<File> {
-    let path = get_portlist_file_path(data_dir).with_added_extension("lock");
-    let file = get_file(&path)?;
-    file.lock()?;
-    Ok(file)
-}
 
 pub fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
     data_dir.join(PORTLIST_FILE_NAME)
@@ -73,25 +61,17 @@ pub fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     }
 }
 
-fn truncate(file: &mut File) -> Result<()> {
-    file.set_len(0)?;
-    file.seek(SeekFrom::Start(0))?;
-
-    Ok(())
-}
-
 pub fn save_ports(ports: BiMap<String, u16>, lock_file: File, data_dir: &PathBuf) -> Result<()> {
     let json = serde_json::to_string_pretty(&ports)?;
 
     let path = get_portlist_file_path(data_dir);
-    let temp_path = path.with_added_extension("tmp");
-    let mut temp_file = get_file(&temp_path)?;
+    let (mut temp_file, part_file_path) = get_part_file(&path)?;
     truncate(&mut temp_file)?;
     temp_file.write_all(json.as_bytes())?;
     temp_file.sync_all()?;
     drop(temp_file);
 
-    fs::rename(&temp_path, &path)?;
+    fs::rename(&part_file_path, &path)?;
 
     #[cfg(unix)]
     File::open(data_dir)?.sync_all()?;
@@ -107,7 +87,7 @@ pub async fn play_html_game(
     app_dirs: &AppDirs,
     verbose: bool,
 ) -> anyhow::Result<()> {
-    let lock = acquire_portlist_lock(&app_dirs.data_dir)?;
+    let lock = acquire_lock(&get_portlist_file_path(&app_dirs.data_dir))?;
     let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
     let mut ports = load_ports(&mut file)?;
     let port = ports.get_by_left(game.id());
