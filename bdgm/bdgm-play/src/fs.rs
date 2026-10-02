@@ -4,9 +4,13 @@ use std::{
     path::PathBuf,
 };
 
-pub fn acquire_lock(path: &PathBuf) -> io::Result<File> {
+pub fn acquire_lock(path: &PathBuf, block: bool) -> io::Result<File> {
     let file = get_file(&path.with_added_extension("lock"))?;
-    file.try_lock()?;
+    if block {
+        file.lock()?;
+    } else {
+        file.try_lock()?;
+    }
     Ok(file)
 }
 

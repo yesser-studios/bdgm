@@ -17,7 +17,7 @@ pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow:
             std::fs::remove_dir_all(&install_part_dir)?;
         }
         dir::create_all(&install_part_dir, false)?;
-        let lock = acquire_lock(&install_dir).map_err(|_| {
+        let lock = acquire_lock(&install_dir, false).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::ResourceBusy,
                 "An installation is in progress.",

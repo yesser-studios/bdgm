@@ -87,7 +87,7 @@ pub async fn play_html_game(
     app_dirs: &AppDirs,
     verbose: bool,
 ) -> anyhow::Result<()> {
-    let lock = acquire_lock(&get_portlist_file_path(&app_dirs.data_dir))?;
+    let lock = acquire_lock(&get_portlist_file_path(&app_dirs.data_dir), true)?;
     let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
     let mut ports = load_ports(&mut file)?;
     let port = ports.get_by_left(game.id());
