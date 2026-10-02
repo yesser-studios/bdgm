@@ -4,9 +4,22 @@ use std::{
     path::PathBuf,
 };
 
-pub fn acquire_lock(path: &PathBuf, block: bool) -> io::Result<File> {
+use fs_extra::dir;
+
+use crate::error::IoError;
+
+pub fn acquire_lock(path: &PathBuf, blocking: bool) -> Result<File, IoError> {
+    match path.parent() {
+        Some(dir_path) => {
+            if dir_path.is_dir() {
+                dir::create_all(dir_path, false)?;
+            }
+        }
+        None => todo!(),
+    }
+
     let file = get_file(&path.with_added_extension("lock"))?;
-    if block {
+    if blocking {
         file.lock()?;
     } else {
         file.try_lock()?;
