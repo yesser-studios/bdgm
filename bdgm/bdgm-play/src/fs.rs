@@ -6,7 +6,7 @@ use std::{
 
 pub fn acquire_lock(path: &PathBuf) -> io::Result<File> {
     let file = get_file(&path.with_added_extension("lock"))?;
-    file.lock()?;
+    file.try_lock()?;
     Ok(file)
 }
 
