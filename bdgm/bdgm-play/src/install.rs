@@ -17,7 +17,7 @@ pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow:
                 io::ErrorKind::ResourceBusy,
                 "An installation is in progress.",
             )
-        });
+        })?;
         if install_part_dir.try_exists()? {
             println!("Installation part directory exists but lock is not held. Removing...");
             std::fs::remove_dir_all(&install_part_dir)?;
