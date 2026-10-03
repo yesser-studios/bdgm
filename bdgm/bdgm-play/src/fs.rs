@@ -1,14 +1,14 @@
 use std::{
     fs::File,
     io::{self, Seek, SeekFrom},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use fs_extra::dir;
 
 use crate::error::IoError;
 
-pub fn acquire_lock(path: &PathBuf, blocking: bool) -> Result<File, IoError> {
+pub fn acquire_lock(path: &Path, blocking: bool) -> Result<File, IoError> {
     match path.parent() {
         Some(dir_path) => {
             if dir_path.exists() && !dir_path.is_dir() {
@@ -34,7 +34,7 @@ pub fn acquire_lock(path: &PathBuf, blocking: bool) -> Result<File, IoError> {
     Ok(file)
 }
 
-pub fn get_file(path: &PathBuf) -> io::Result<File> {
+pub fn get_file(path: &Path) -> io::Result<File> {
     File::options()
         .write(true)
         .read(true)
@@ -42,7 +42,7 @@ pub fn get_file(path: &PathBuf) -> io::Result<File> {
         .open(path)
 }
 
-pub fn get_part_file(path: &PathBuf) -> io::Result<(File, PathBuf)> {
+pub fn get_part_file(path: &Path) -> io::Result<(File, PathBuf)> {
     let path = path.with_added_extension("part");
     Ok((get_file(&path)?, path))
 }
