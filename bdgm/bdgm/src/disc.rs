@@ -194,7 +194,7 @@ mod test {
 
     #[test]
     fn sample_dir_written() {
-        let entry = Entry::scan_dir("../disc").unwrap();
+        let entry = Entry::scan_dir("../../disc").unwrap();
         entry
             .write_udf("./result.udf".into(), UdfRevision::V2_50)
             .unwrap();

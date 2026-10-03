@@ -16,7 +16,12 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2404, windows-latest, blacksmith-6vcpu-macos-15]
+        os:
+          [
+            blacksmith-4vcpu-ubuntu-2404,
+            windows-latest,
+            blacksmith-6vcpu-macos-15,
+          ]
 
     runs-on: ${{matrix.os}}
 
@@ -30,10 +35,3 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
         working-directory: ./bdgm
-
-      - name: Build bdgm-play
-        run: cargo build
-        working-directory: ./bdgm/bdgm-play
-      - name: Build bdgm-build
-        run: cargo build
-        working-directory: ./bdgm/bdgm-build

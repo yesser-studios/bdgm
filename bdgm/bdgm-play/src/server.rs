@@ -1,16 +1,24 @@
 use std::{
     fs::{self, File},
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Write},
     path::PathBuf,
 };
 
 use anyhow::{Context, Result};
 use axum::Router;
+use bdgm::game::ValidatedGame;
 use bimap::BiMap;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+use platform_dirs::AppDirs;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
-pub(crate) async fn create_listener(port: Option<u16>) -> Result<TcpListener> {
+use crate::{
+    error::AppError,
+    fs::{acquire_lock, get_file, get_part_file, truncate},
+};
+
+pub async fn create_listener(port: Option<u16>) -> Result<TcpListener> {
     match port {
         Some(port) => Ok(TcpListener::bind(("127.0.0.1", port))
             .await
@@ -21,7 +29,7 @@ pub(crate) async fn create_listener(port: Option<u16>) -> Result<TcpListener> {
     }
 }
 
-pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<()> {
+pub async fn serve(listener: TcpListener, directory: &PathBuf) -> Result<()> {
     let app = Router::new().fallback_service(ServeDir::new(directory));
 
     axum::serve(listener, app).await.context("Server crashed")?;
@@ -31,26 +39,11 @@ pub(crate) async fn serve(listener: TcpListener, directory: PathBuf) -> Result<(
 
 const PORTLIST_FILE_NAME: &'static str = "ports.json";
 
-pub(crate) fn get_file(path: &PathBuf) -> Result<File> {
-    Ok(File::options()
-        .write(true)
-        .read(true)
-        .create(true)
-        .open(path)?)
-}
-
-pub(crate) fn acquire_portlist_lock(data_dir: &PathBuf) -> Result<File> {
-    let path = get_portlist_file_path(data_dir).with_added_extension("lock");
-    let file = get_file(&path)?;
-    file.lock()?;
-    Ok(file)
-}
-
-pub(crate) fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
+pub fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
     data_dir.join(PORTLIST_FILE_NAME)
 }
 
-pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
+pub fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     let mut json = String::new();
     match file.read_to_string(&mut json) {
         Ok(_) => {
@@ -68,29 +61,17 @@ pub(crate) fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     }
 }
 
-fn truncate(file: &mut File) -> Result<()> {
-    file.set_len(0)?;
-    file.seek(SeekFrom::Start(0))?;
-
-    Ok(())
-}
-
-pub(crate) fn save_ports(
-    ports: BiMap<String, u16>,
-    lock_file: File,
-    data_dir: &PathBuf,
-) -> Result<()> {
+pub fn save_ports(ports: BiMap<String, u16>, lock_file: File, data_dir: &PathBuf) -> Result<()> {
     let json = serde_json::to_string_pretty(&ports)?;
 
     let path = get_portlist_file_path(data_dir);
-    let temp_path = path.with_added_extension("tmp");
-    let mut temp_file = get_file(&temp_path)?;
+    let (mut temp_file, part_file_path) = get_part_file(&path)?;
     truncate(&mut temp_file)?;
     temp_file.write_all(json.as_bytes())?;
     temp_file.sync_all()?;
     drop(temp_file);
 
-    fs::rename(&temp_path, &path)?;
+    fs::rename(&part_file_path, &path)?;
 
     #[cfg(unix)]
     File::open(data_dir)?.sync_all()?;
@@ -99,3 +80,69 @@ pub(crate) fn save_ports(
 
     Ok(())
 }
+
+pub async fn play_html_game(
+    game: &ValidatedGame,
+    install_dir: &PathBuf,
+    app_dirs: &AppDirs,
+    verbose: bool,
+) -> anyhow::Result<()> {
+    let lock = acquire_lock(&get_portlist_file_path(&app_dirs.data_dir), true)?;
+    let mut file = get_file(&get_portlist_file_path(&app_dirs.data_dir))?;
+    let mut ports = load_ports(&mut file)?;
+    let port = ports.get_by_left(game.id());
+
+    let listener = match port {
+        Some(port) => {
+            drop(file);
+            drop(lock);
+            create_listener(Some(*port)).await?
+        }
+        None => {
+            let mut listener = create_listener(None).await?;
+            let mut port = listener.local_addr()?.port();
+
+            let mut tries = 0;
+            while ports.get_by_right(&&port).is_some() {
+                listener = create_listener(None).await?;
+                port = listener.local_addr()?.port();
+
+                tries += 1;
+                if tries >= 5000 {
+                    return Err(AppError::CouldNotFindUnclaimedPort.into());
+                }
+            }
+
+            ports.insert(game.id().to_string(), listener.local_addr()?.port());
+            if verbose {
+                println!("Persisting port {}...", listener.local_addr()?.port());
+            }
+            drop(file);
+            save_ports(ports, lock, &app_dirs.data_dir)?;
+            listener
+        }
+    };
+
+    let executable = game.executable().to_string_lossy();
+    let encoded = utf8_percent_encode(&executable, &ENCODE_SET);
+
+    let address = format!("http://{}/{}", listener.local_addr()?, encoded);
+    if verbose {
+        println!("Opening {address}");
+    }
+    webbrowser::open(&address)?;
+
+    if verbose {
+        println!("Running server, press Ctrl + C to stop.");
+    }
+    serve(listener, install_dir).await?;
+
+    Ok(())
+}
+
+const ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'/')
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
