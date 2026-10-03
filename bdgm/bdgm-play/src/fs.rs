@@ -11,11 +11,18 @@ use crate::error::IoError;
 pub fn acquire_lock(path: &PathBuf, blocking: bool) -> Result<File, IoError> {
     match path.parent() {
         Some(dir_path) => {
-            if dir_path.is_dir() {
-                dir::create_all(dir_path, false)?;
+            if dir_path.exists() && !dir_path.is_dir() {
+                return Err(IoError::IoError(io::Error::new(
+                    io::ErrorKind::NotADirectory,
+                    format!(
+                        "Parent of {} (which was attempted to lock) exists but is not a directory",
+                        path.display()
+                    ),
+                )));
             }
+            dir::create_all(dir_path, false)?;
         }
-        None => todo!(),
+        None => {} // Parent does not exist so locking will probably fail, but we'll still try
     }
 
     let file = get_file(&path.with_added_extension("lock"))?;
