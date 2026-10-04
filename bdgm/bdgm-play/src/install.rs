@@ -12,7 +12,7 @@ pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow:
     let install_dir = game_dir.join("app").join(game.version());
     let install_part_dir = install_dir.with_added_extension("part");
     if !install_dir.try_exists()? {
-        let lock = acquire_lock(&install_dir, false).map_err(|e| match e {
+        let lock = acquire_lock(&install_dir, false, false).map_err(|e| match e {
             crate::error::IoError::TryLockError(try_lock_error) => io::Error::new(
                 io::ErrorKind::ResourceBusy,
                 format!("An installation is in progress: {}", try_lock_error),

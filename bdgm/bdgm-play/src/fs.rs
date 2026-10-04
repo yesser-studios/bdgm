@@ -8,7 +8,7 @@ use fs_extra::dir;
 
 use crate::error::IoError;
 
-pub fn acquire_lock(path: &Path, blocking: bool) -> Result<File, IoError> {
+pub fn acquire_lock(path: &Path, blocking: bool, verbose: bool) -> Result<File, IoError> {
     match path.parent() {
         Some(dir_path) => {
             if dir_path.exists() && !dir_path.is_dir() {
@@ -26,7 +26,18 @@ pub fn acquire_lock(path: &Path, blocking: bool) -> Result<File, IoError> {
     }
 
     let file = get_file(&path.with_added_extension("lock"))?;
-    if blocking {
+    if blocking && verbose {
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(e) => match e {
+                std::fs::TryLockError::Error(error) => return Err(error.into()),
+                std::fs::TryLockError::WouldBlock => {
+                    println!("Waiting for lock on {}...", path.display());
+                    file.lock()?;
+                }
+            },
+        };
+    } else if blocking && !verbose {
         file.lock()?;
     } else {
         file.try_lock()?;
