@@ -11,7 +11,7 @@ async fn main() {
     let args = Args::parse();
 
     let status = match args.location {
-        Some(_) => run(args).await,
+        Some(_) => run(args).await.map(|x| Some(x)),
         None => {
             if args.is_raw_disc() {
                 eprintln!(
@@ -24,18 +24,26 @@ async fn main() {
                 );
                 std::process::exit(1);
             } else {
-                run_gui(args).await
+                match run_gui(args) {
+                    Ok(_) => Ok(None),
+                    Err(e) => {
+                        eprintln!("Error while running app: {e}");
+                        std::process::exit(1);
+                    }
+                }
             }
         }
     };
 
     match status {
         Ok(status) => {
-            if let Some(code) = status.code() {
-                std::process::exit(code);
-            } else if !status.success() {
-                // For example on SIGKILL
-                std::process::exit(1);
+            if let Some(status) = status {
+                if let Some(code) = status.code() {
+                    std::process::exit(code);
+                } else if !status.success() {
+                    // For example on SIGKILL
+                    std::process::exit(1);
+                }
             }
         }
         Err(e) => {
