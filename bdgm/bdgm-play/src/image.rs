@@ -41,7 +41,7 @@ pub fn resolve_image_args(args: Args) -> anyhow::Result<(Args, Option<TempDir>)>
         ImageState::RawDisc => {
             let dump_file = NamedTempFile::new()?;
             dump_disc(
-                &args.location.to_string_lossy(),
+                &args.location.ok_or(IoError::PathNone)?.to_string_lossy(),
                 &dump_file.path().to_string_lossy(),
             )?;
 
