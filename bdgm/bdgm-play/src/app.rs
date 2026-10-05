@@ -5,7 +5,7 @@ use bdgm_play::{args::Args, image::resolve_image_args, run_sanitized};
 pub(crate) async fn run(args: Args) -> anyhow::Result<ExitStatus> {
     let (args, tempdir) = resolve_image_args(args)?;
 
-    let result = run_sanitized(args).await;
+    let result = run_sanitized(args, true).await;
     drop(tempdir);
     result
 }

@@ -9,7 +9,7 @@ pub async fn run_gui(mut args: Args) -> anyhow::Result<ExitStatus> {
 
 async fn play(args: Args) -> anyhow::Result<ExitStatus> {
     let (args, tempdir) = resolve_image_args(args)?;
-    let result = run_sanitized(args).await;
+    let result = run_sanitized(args, false).await;
     drop(tempdir);
 
     result

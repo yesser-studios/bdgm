@@ -24,7 +24,7 @@ pub fn read_manifest(args: &Args) -> anyhow::Result<String> {
     Ok(contents)
 }
 
-pub async fn run_sanitized(args: Args) -> anyhow::Result<ExitStatus> {
+pub async fn run_sanitized(args: Args, verbose: bool) -> anyhow::Result<ExitStatus> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
     let manifest = read_manifest(&args)?;
 
@@ -35,7 +35,7 @@ pub async fn run_sanitized(args: Args) -> anyhow::Result<ExitStatus> {
     install(&game, &app_dirs, &args)?;
 
     println!("Launching...");
-    let status = launch_game(&game, &args, &app_dirs, true).await?;
+    let status = launch_game(&game, &args, &app_dirs, verbose).await?;
 
     Ok(status)
 }
