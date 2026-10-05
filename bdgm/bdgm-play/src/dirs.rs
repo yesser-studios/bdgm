@@ -3,7 +3,13 @@ use std::path::PathBuf;
 use bdgm::{error::BDGMError, game::ValidatedGame};
 use platform_dirs::AppDirs;
 
-use crate::{args::Args, error::AppError};
+use crate::{
+    args::Args,
+    error::{
+        AppError,
+        IoError::{self},
+    },
+};
 
 pub struct GameDirs {
     pub root: PathBuf,
@@ -28,12 +34,16 @@ impl GameDirs {
     }
 }
 
-pub fn get_app_dir_path(args: &Args) -> PathBuf {
-    args.location.join("BDGM").join("APP")
+pub fn get_app_dir_path(args: &Args) -> Option<PathBuf> {
+    args.location.as_ref().map(|p| p.join("BDGM").join("APP"))
 }
 
 pub fn try_get_executable_path(args: &Args, game: &ValidatedGame) -> anyhow::Result<PathBuf> {
-    let app_dir_path = get_app_dir_path(args);
+    let app_dir_path = match get_app_dir_path(args) {
+        Some(p) => p,
+        None => return Err(IoError::PathNone.into()),
+    };
+
     let executable_path = app_dir_path.join(&game.executable());
 
     if !executable_path.try_exists()? {
@@ -47,7 +57,10 @@ pub fn try_get_executable_path(args: &Args, game: &ValidatedGame) -> anyhow::Res
 }
 
 pub fn try_get_manifest_path(args: &Args) -> anyhow::Result<PathBuf> {
-    let manifest_path = args.location.join("BDGM").join("DISC.BDGM");
+    let manifest_path = match args.location.as_ref() {
+        Some(p) => p.join("BDGM").join("DISC.BDGM"),
+        None => return Err(IoError::PathNone.into()),
+    };
 
     if !manifest_path.try_exists()? {
         return Err(BDGMError::DiscFileMissing.into());

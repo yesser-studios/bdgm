@@ -27,6 +27,7 @@ pub enum IoError {
     IoError(io::Error),
     TryLockError(fs::TryLockError),
     FsExtraError(fs_extra::error::Error),
+    PathNone,
 }
 
 impl Display for IoError {
@@ -35,6 +36,7 @@ impl Display for IoError {
             IoError::IoError(error) => error.fmt(f),
             IoError::TryLockError(error) => error.fmt(f),
             IoError::FsExtraError(error) => error.fmt(f),
+            IoError::PathNone => write!(f, "Path is None"),
         }
     }
 }

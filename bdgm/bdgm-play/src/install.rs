@@ -4,7 +4,7 @@ use bdgm::game::ValidatedGame;
 use fs_extra::dir::{self, CopyOptions};
 use platform_dirs::AppDirs;
 
-use crate::{args::Args, dirs::get_app_dir_path, fs::acquire_lock};
+use crate::{args::Args, dirs::get_app_dir_path, error::IoError, fs::acquire_lock};
 
 pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow::Result<()> {
     let id = game.id();
@@ -28,7 +28,7 @@ pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow:
 
         println!("Copying files...");
         dir::copy(
-            &get_app_dir_path(args),
+            &get_app_dir_path(args).ok_or(IoError::PathNone)?,
             &install_part_dir,
             &CopyOptions::new().overwrite(true).content_only(true),
         )?;

@@ -26,11 +26,12 @@ pub fn get_envvars(
         game_dirs.data.to_string_lossy().into_owned(),
     );
     envvars.insert("BDGM_CACHE", game_dirs.cache.to_string_lossy().into_owned());
-    envvars.insert(
-        "BDGM_APP",
-        get_app_dir_path(args).to_string_lossy().into_owned(),
-    );
-    envvars.insert("BDGM_DISC", args.location.to_string_lossy().into_owned());
+    if let Some(path) = get_app_dir_path(args) {
+        envvars.insert("BDGM_APP", path.to_string_lossy().into_owned());
+    }
+    if let Some(path) = &args.location {
+        envvars.insert("BDGM_DISC", path.to_string_lossy().into_owned());
+    }
     envvars.insert("BDGM_VERSION", game.bdgm_version().to_string());
 
     envvars

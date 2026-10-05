@@ -7,7 +7,7 @@ use clap::Parser;
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// The mounted root of the game disc. This is the parent of the BDGM directory.
-    pub location: PathBuf,
+    pub location: Option<PathBuf>,
 
     /// Whether the path points to an image instead of a mount point.
     #[arg(long)]
@@ -24,7 +24,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn new_imageless(location: PathBuf, runtime: Option<PathBuf>) -> Self {
+    pub fn new_imageless(location: Option<PathBuf>, runtime: Option<PathBuf>) -> Self {
         #[cfg(windows)]
         {
             Args {
@@ -52,5 +52,15 @@ impl Args {
 
         #[allow(unreachable_code)]
         false
+    }
+
+    #[allow(unused)]
+    pub fn set_raw_disc(&mut self, value: bool) -> Option<()> {
+        #[cfg(windows)]
+        {
+            self.raw_disc = value;
+            return Some(());
+        }
+        None
     }
 }
