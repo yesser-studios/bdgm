@@ -1,6 +1,18 @@
-use std::{path::PathBuf, process::ExitStatus};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use bdgm_play::{args::Args, image::resolve_image_args, run_sanitized};
+use bdgm::game::{Game, ValidatedGame};
+use bdgm_play::{
+    args::Args,
+    dirs::GameDirs,
+    image::resolve_image_args,
+    install::install,
+    launch::{kill_process, spawn_game_process, wait_for_process},
+    read_manifest,
+    server::start_html_server,
+};
 #[cfg(windows)]
 use iced::widget::column;
 use iced::{
@@ -10,14 +22,128 @@ use iced::{
     font::{Font, Weight},
     widget::{button, container, row, text, text::Text},
 };
+use platform_dirs::AppDirs;
 use rfd::{AsyncFileDialog, FileHandle};
+use tempfile::TempDir;
 
-#[derive(Debug, Default)]
+// ---------------------------------------------------------------------------
+// GAME INFO GROUNDWORK
+//
+// `GameInfo` is the display model for the running-game modal. It is built
+// once at launch from `ValidatedGame` (+ the HTML server URL when relevant)
+// and stored in `AppState::playing_info`. Extend this struct (e.g. cover art,
+// description, playtime) to show more in the modal without touching the
+// launch/kill plumbing.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+struct GameInfo {
+    name: String,
+    id: String,
+    version: String,
+    executable: String,
+    runtime: String,
+    runtime_version: Option<String>,
+    /// Set for HTML games (server URL opened in the browser).
+    url: Option<String>,
+}
+
+impl From<&ValidatedGame> for GameInfo {
+    fn from(game: &ValidatedGame) -> Self {
+        Self {
+            name: game.name().to_owned(),
+            id: game.id().to_owned(),
+            version: game.version().to_owned(),
+            executable: game.executable().to_string_lossy().into_owned(),
+            runtime: game.runtime().to_string(),
+            runtime_version: game.runtime_version().map(|s| s.to_owned()),
+            url: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Phase {
+    #[default]
+    Idle,
+    Starting,
+    Playing,
+}
+
+// Killable handle for whatever is running behind the modal.
+#[derive(Clone)]
+enum PlayHandle {
+    Process(bdgm_play::launch::ProcessHandle),
+    Server { abort: tokio::task::AbortHandle },
+}
+
+impl std::fmt::Debug for PlayHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Process(_) => f.write_str("Process(..)"),
+            Self::Server { .. } => f.write_str("Server(..)"),
+        }
+    }
+}
+
+// Session created by the background start task. Moved into `AppState` on
+// `GameStarted(Ok)` via the slot below — never travels inside `Message`
+// (which must stay `Clone`), so it can hold `JoinHandle` + `TempDir`.
+struct StartedSession {
+    handle: StartedHandle,
+    tempdir: Option<TempDir>,
+    info: GameInfo,
+}
+
+enum StartedHandle {
+    Process(bdgm_play::launch::ProcessHandle),
+    Server {
+        join: tokio::task::JoinHandle<anyhow::Result<()>>,
+        abort: tokio::task::AbortHandle,
+    },
+}
+
+type Slot = Arc<Mutex<Option<StartedSession>>>;
+
 struct AppState {
     #[cfg(windows)]
     show_drive_picker: bool,
     #[cfg(windows)]
     drives: Vec<char>,
+    phase: Phase,
+    status: String,
+    starting_slot: Option<Slot>,
+    playing_info: Option<GameInfo>,
+    playing_handle: Option<PlayHandle>,
+    playing_tempdir: Option<TempDir>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            #[cfg(windows)]
+            show_drive_picker: false,
+            #[cfg(windows)]
+            drives: Vec::new(),
+            phase: Phase::Idle,
+            status: String::from("Pick a disc or image to start."),
+            starting_slot: None,
+            playing_info: None,
+            playing_handle: None,
+            playing_tempdir: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppState")
+            .field("phase", &self.phase)
+            .field("status", &self.status)
+            .field("playing_info", &self.playing_info)
+            .field("playing_handle", &self.playing_handle)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +160,9 @@ enum Message {
     OpenImage(PathBuf),
     #[cfg(windows)]
     DrivePickerClosed,
+    GameStarted(Result<GameInfo, String>),
+    GameExited(Result<Option<i32>, String>),
+    StopGame,
     None,
 }
 
@@ -115,11 +244,93 @@ fn open_image_file() -> Task<Message> {
     )
 }
 
-fn run_args(args: Args) -> Task<Message> {
-    Task::perform(play(args), |r| {
-        r.unwrap(); // TODO: replace unwrap with error handling
-        Message::None
-    })
+// Background start: resolve image -> manifest -> validate -> install ->
+// spawn killable process or HTML server. Stores the session in `slot` and
+// returns only the display info so `Message` stays `Clone`.
+async fn start_game_task(args: Args, slot: Slot) -> Result<GameInfo, String> {
+    let result: anyhow::Result<GameInfo> = (|| async {
+        let (resolved, tempdir) = resolve_image_args(args)?;
+        let manifest = read_manifest(&resolved)?;
+        let game = Game::from_str(&manifest)?;
+        let game = ValidatedGame::validate(game)?;
+
+        let app_dirs =
+            AppDirs::new(Some("bdgm-play"), true).ok_or_else(|| anyhow::anyhow!("NoAppDirs"))?;
+        // NOTE: runs on the async runtime; large installs will briefly block
+        // the UI. Future work: move into `spawn_blocking` with progress.
+        install(&game, &app_dirs, &resolved)?;
+
+        let mut info = GameInfo::from(&game);
+        let handle = match game.runtime() {
+            bdgm::runtime::Runtime::HTML => {
+                let game_dirs = GameDirs::from(&game, &app_dirs);
+                let server = start_html_server(&game, &game_dirs.install, &app_dirs, false).await?;
+                info.url = Some(server.url.clone());
+                StartedHandle::Server {
+                    join: server.join,
+                    abort: server.abort,
+                }
+            }
+            _ => {
+                let proc = spawn_game_process(&game, &resolved, &app_dirs)?;
+                StartedHandle::Process(proc)
+            }
+        };
+
+        slot.lock()
+            .map_err(|_| anyhow::anyhow!("starting slot poisoned"))?
+            .replace(StartedSession {
+                handle,
+                tempdir,
+                info: info.clone(),
+            });
+
+        Ok(info)
+    })()
+    .await;
+
+    result.map_err(|e| format!("{e:#}"))
+}
+
+async fn wait_process_task(
+    handle: bdgm_play::launch::ProcessHandle,
+) -> Result<Option<i32>, String> {
+    wait_for_process(handle).await.map_err(|e| format!("{e:#}"))
+}
+
+async fn wait_server_task(
+    join: tokio::task::JoinHandle<anyhow::Result<()>>,
+) -> Result<Option<i32>, String> {
+    match join.await {
+        Ok(Ok(())) => Ok(None),
+        Ok(Err(e)) => Err(format!("Server crashed: {e:#}")),
+        Err(join_err) if join_err.is_cancelled() => Ok(None),
+        Err(join_err) => Err(format!("Server task failed: {join_err}")),
+    }
+}
+
+async fn kill_process_task(handle: bdgm_play::launch::ProcessHandle) {
+    kill_process(&handle).await;
+}
+
+fn is_busy(state: &AppState) -> bool {
+    matches!(state.phase, Phase::Starting | Phase::Playing)
+}
+
+fn begin_launch(state: &mut AppState, args: Args) -> Task<Message> {
+    if is_busy(state) {
+        state.status = String::from("A game is already running — stop it first.");
+        return Task::none();
+    }
+    let slot: Slot = Arc::new(Mutex::new(None));
+    state.starting_slot = Some(Arc::clone(&slot));
+    state.phase = Phase::Starting;
+    state.status = String::from("Starting game...");
+    Task::perform(start_game_task(args, slot), Message::GameStarted)
+}
+
+fn take_starting_session(state: &mut AppState) -> Option<StartedSession> {
+    state.starting_slot.take()?.lock().ok()?.take()
 }
 
 #[allow(unused_variables)]
@@ -128,6 +339,10 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
     match message {
         #[cfg(windows)]
         Message::OpenDrivePicker => {
+            if is_busy(state) {
+                state.status = String::from("A game is already running — stop it first.");
+                return Task::none();
+            }
             state.drives = list_candidate_drives();
             state.show_drive_picker = true;
             Task::none()
@@ -136,7 +351,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::OpenDiscRaw(letter) => {
             state.show_drive_picker = false;
             resolve_raw_disc(&mut args, letter);
-            run_args(args)
+            begin_launch(state, args)
         }
         #[cfg(windows)]
         Message::DrivePickerClosed => {
@@ -146,15 +361,111 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         #[cfg(unix)]
         Message::OpenDiscMounted(path) => {
             resolve_mounted_disc(&mut args, path);
-            run_args(args)
+            begin_launch(state, args)
         }
         Message::OpenImage(path) => {
             resolve_image(&mut args, path);
-            run_args(args)
+            begin_launch(state, args)
         }
         #[cfg(unix)]
-        Message::OpenDiscDirectory => open_disc_folder(),
-        Message::OpenImageFile => open_image_file(),
+        Message::OpenDiscDirectory => {
+            if is_busy(state) {
+                state.status = String::from("A game is already running — stop it first.");
+                return Task::none();
+            }
+            open_disc_folder()
+        }
+        Message::OpenImageFile => {
+            if is_busy(state) {
+                state.status = String::from("A game is already running — stop it first.");
+                return Task::none();
+            }
+            open_image_file()
+        }
+        Message::GameStarted(result) => match result {
+            Ok(_) => {
+                let Some(session) = take_starting_session(state) else {
+                    state.phase = Phase::Idle;
+                    state.status = String::from("Game started but session was lost.");
+                    return Task::none();
+                };
+                state.status = format!("Running: {}", session.info.name);
+                state.playing_info = Some(session.info.clone());
+                match session.handle {
+                    StartedHandle::Process(proc) => {
+                        state.playing_handle = Some(PlayHandle::Process(proc.clone()));
+                        state.playing_tempdir = session.tempdir;
+                        state.phase = Phase::Playing;
+                        Task::perform(wait_process_task(proc), Message::GameExited)
+                    }
+                    StartedHandle::Server { join, abort } => {
+                        state.playing_handle = Some(PlayHandle::Server { abort });
+                        state.playing_tempdir = session.tempdir;
+                        state.phase = Phase::Playing;
+                        Task::perform(wait_server_task(join), Message::GameExited)
+                    }
+                }
+            }
+            Err(err) => {
+                state.starting_slot = None;
+                state.phase = Phase::Idle;
+                state.status = format!("Failed to start: {err}");
+                Task::none()
+            }
+        },
+        Message::GameExited(result) => {
+            // Natural exit or server crash: auto-close the modal by leaving
+            // `Playing`. Dropping `playing_tempdir` cleans the extract dir;
+            // the port was already freed because the server task ended.
+            state.playing_handle = None;
+            state.playing_tempdir = None;
+            state.starting_slot = None;
+            state.phase = Phase::Idle;
+            match result {
+                Ok(code) => {
+                    let name = state
+                        .playing_info
+                        .as_ref()
+                        .map(|i| i.name.clone())
+                        .unwrap_or_else(|| String::from("Game"));
+                    state.status = match code {
+                        Some(0) | None => format!("{name} exited."),
+                        Some(c) => format!("{name} exited with code {c}."),
+                    };
+                }
+                Err(err) => {
+                    state.status = format!("Game ended: {err}");
+                }
+            }
+            Task::none()
+        }
+        Message::StopGame => {
+            // Modal closed by the user: kill whatever is running. The waiter
+            // task then reports `GameExited`, which auto-closes the modal
+            // and frees the port / temp dir.
+            match state.playing_handle.clone() {
+                Some(PlayHandle::Process(proc)) => {
+                    state.status = String::from("Stopping game...");
+                    Task::perform(
+                        async move {
+                            kill_process_task(proc).await;
+                        },
+                        |_| Message::None,
+                    )
+                }
+                Some(PlayHandle::Server { abort }) => {
+                    abort.abort();
+                    state.status = String::from("Stopping server...");
+                    Task::none()
+                }
+                None => {
+                    state.playing_tempdir = None;
+                    state.phase = Phase::Idle;
+                    state.status = String::from("Pick a disc or image to start.");
+                    Task::none()
+                }
+            }
+        }
         Message::None => Task::none(),
     }
 }
@@ -173,6 +484,41 @@ fn centered_label<'a>(label: impl Into<String>) -> Element<'a, Message> {
         .center_x(Fill)
         .center_y(Fill)
         .into()
+}
+
+// GAME INFO GROUNDWORK: extend this card (art, description, version history)
+// — all data comes from `AppState::playing_info: Option<GameInfo>`.
+fn game_modal<'a>(info: &'a GameInfo) -> Element<'a, Message> {
+    let mut card = iced::widget::column![
+        text(format!("Running: {}", info.name)).size(22),
+        text(format!("ID: {}   Version: {}", info.id, info.version)).size(14),
+        text(format!("Executable: {}", info.executable)).size(14),
+        text(format!(
+            "Runtime: {}{}",
+            info.runtime,
+            info.runtime_version
+                .as_ref()
+                .map(|v| format!(" ({v})"))
+                .unwrap_or_default()
+        ))
+        .size(14),
+    ]
+    .spacing(4)
+    .padding(16);
+
+    if let Some(url) = &info.url {
+        card = card.push(text(format!("Serving at {url}")).size(14));
+    }
+
+    card = card.push(
+        row![
+            button(button_text("Stop")).on_press(Message::StopGame),
+            button(button_text("Close")).on_press(Message::StopGame),
+        ]
+        .spacing(10),
+    );
+
+    container(card).padding(8).into()
 }
 
 #[allow(unused_variables)]
@@ -194,42 +540,57 @@ fn view(state: &AppState) -> Element<'_, Message> {
             .into();
     }
 
+    let busy = is_busy(state);
+
     #[cfg(windows)]
-    let open_disc_button = button(button_text("Open Disc")).on_press(Message::OpenDrivePicker);
+    let open_disc_button = button(button_text("Open Disc")).on_press_maybe(if busy {
+        None
+    } else {
+        Some(Message::OpenDrivePicker)
+    });
     #[cfg(unix)]
     let open_disc_button = button(centered_label("Open Disc"))
         .width(150)
         .height(150)
-        .on_press(Message::OpenDiscDirectory);
+        .on_press_maybe(if busy {
+            None
+        } else {
+            Some(Message::OpenDiscDirectory)
+        });
 
-    container(
-        row![
-            open_disc_button,
-            button(centered_label("Open Image"))
-                .width(150)
-                .height(150)
-                .on_press(Message::OpenImageFile)
-        ]
-        .spacing(10),
-    )
-    .padding(10)
-    .center_x(Fill)
-    .center_y(Fill)
-    .into()
+    let open_image_button = button(centered_label("Open Image"))
+        .width(150)
+        .height(150)
+        .on_press_maybe(if busy {
+            None
+        } else {
+            Some(Message::OpenImageFile)
+        });
+
+    let mut main = iced::widget::column![
+        row![open_disc_button, open_image_button].spacing(10),
+        text(state.status.clone()).size(14),
+    ]
+    .spacing(10)
+    .padding(10);
+
+    // Popup shown after starting a game. Closing it (Stop/Close) kills the
+    // child process or aborts the HTML server; it hides itself on GameExited.
+    if state.phase == Phase::Playing {
+        if let Some(info) = &state.playing_info {
+            main = main.push(game_modal(info));
+        }
+    } else if state.phase == Phase::Starting {
+        main = main.push(text("Starting game...").size(14));
+    }
+
+    container(main).center_x(Fill).center_y(Fill).into()
 }
 
 pub fn run_gui(_args: Args) -> iced::Result {
     iced::application(new, update, view)
         .theme(|_: &AppState| Theme::CatppuccinMocha)
         .run()
-}
-
-async fn play(args: Args) -> anyhow::Result<ExitStatus> {
-    let (args, tempdir) = resolve_image_args(args)?;
-    let result = run_sanitized(args, false).await;
-    drop(tempdir);
-
-    result
 }
 
 #[allow(unused)]
