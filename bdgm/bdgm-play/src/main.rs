@@ -11,7 +11,7 @@ async fn main() {
     let args = Args::parse();
 
     let status = match args.location {
-        Some(_) => run(args).await.map(|x| Some(x)),
+        Some(_) => run(args).await.map(Some),
         None => {
             if args.is_raw_disc() {
                 eprintln!(

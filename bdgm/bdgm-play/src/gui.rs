@@ -1,6 +1,8 @@
 use std::{path::PathBuf, process::ExitStatus};
 
 use bdgm_play::{args::Args, image::resolve_image_args, run_sanitized};
+#[cfg(windows)]
+use iced::widget::{column, text};
 use iced::{
     Element,
     Length::Fill,
@@ -10,25 +12,32 @@ use iced::{
 use rfd::{AsyncFileDialog, FileHandle};
 
 #[derive(Debug, Default)]
-struct AppState {}
+struct AppState {
+    #[cfg(windows)]
+    show_drive_picker: bool,
+    #[cfg(windows)]
+    drives: Vec<char>,
+}
 
 #[derive(Debug, Clone)]
 enum Message {
     #[cfg(windows)]
-    OpenDiscFile,
+    OpenDrivePicker,
     #[cfg(unix)]
     OpenDiscDirectory,
     OpenImageFile,
     #[cfg(windows)]
-    OpenDisc(char),
+    OpenDiscRaw(char),
     #[cfg(unix)]
-    OpenDisc(PathBuf),
+    OpenDiscMounted(PathBuf),
     OpenImage(PathBuf),
+    #[cfg(windows)]
+    DrivePickerClosed,
     None,
 }
 
 fn new() -> AppState {
-    AppState {}
+    AppState::default()
 }
 
 fn gen_dialog() -> AsyncFileDialog {
@@ -42,37 +51,67 @@ fn extract_path(file: Option<FileHandle>) -> Option<PathBuf> {
     }
 }
 
+#[cfg(windows)]
+fn list_candidate_drives() -> Vec<char> {
+    use windows_sys::Win32::Storage::FileSystem::{DRIVE_CDROM, GetDriveTypeW, GetLogicalDrives};
+
+    // SAFETY: GetLogicalDrives takes no args and returns a bitmask.
+    let mask = unsafe { GetLogicalDrives() };
+    if mask == 0 {
+        return Vec::new();
+    }
+
+    let mut all = Vec::new();
+    let mut cdrom = Vec::new();
+    for i in 0..26u32 {
+        if (mask & (1 << i)) == 0 {
+            continue;
+        }
+        let letter = (b'A' + i as u8) as char;
+        // NUL-terminated "X:\" UTF-16 for GetDriveTypeW.
+        let path: [u16; 4] = [letter as u16, b':' as u16, b'\\' as u16, 0];
+        // SAFETY: path is a valid NUL-terminated UTF-16 root path.
+        let drive_type = unsafe { GetDriveTypeW(path.as_ptr()) };
+        all.push(letter);
+        if drive_type == DRIVE_CDROM {
+            cdrom.push(letter);
+        }
+    }
+    if cdrom.is_empty() { all } else { cdrom }
+}
+
+#[cfg(unix)]
 fn open_disc_folder() -> Task<Message> {
-    return Task::perform(
-        async || -> Option<PathBuf> {
+    Task::perform(
+        async {
             let res = gen_dialog()
                 .set_title("Select mounted BDGM disc")
                 .pick_folder()
                 .await;
             extract_path(res)
-        }(),
+        },
         |path| match path {
-            Some(path) => Message::OpenDisc(path),
+            Some(path) => Message::OpenDiscMounted(path),
             None => Message::None,
         },
-    );
+    )
 }
 
 fn open_image_file() -> Task<Message> {
-    return Task::perform(
-        async || -> Option<PathBuf> {
+    Task::perform(
+        async {
             let res = gen_dialog()
                 .set_title("Select BDGM image")
-                .add_filter("BDGM Image File", &["bin", "udf", "iso", "bdgm"])
+                .add_filter("BDGM Image File", &["bin", "udf", "iso"])
                 .pick_file()
                 .await;
             extract_path(res)
-        }(),
+        },
         |path| match path {
             Some(path) => Message::OpenImage(path),
             None => Message::None,
         },
-    );
+    )
 }
 
 fn run_args(args: Args) -> Task<Message> {
@@ -82,13 +121,29 @@ fn run_args(args: Args) -> Task<Message> {
     })
 }
 
-fn update(_state: &mut AppState, message: Message) -> Task<Message> {
+#[allow(unused_variables)]
+fn update(state: &mut AppState, message: Message) -> Task<Message> {
     let mut args = Args::new_imageless(None, None);
     match message {
         #[cfg(windows)]
-        Message::OpenDisc(letter) => resolve_raw_disc(&mut args, letter),
+        Message::OpenDrivePicker => {
+            state.drives = list_candidate_drives();
+            state.show_drive_picker = true;
+            Task::none()
+        }
+        #[cfg(windows)]
+        Message::OpenDiscRaw(letter) => {
+            state.show_drive_picker = false;
+            resolve_raw_disc(&mut args, letter);
+            run_args(args)
+        }
+        #[cfg(windows)]
+        Message::DrivePickerClosed => {
+            state.show_drive_picker = false;
+            Task::none()
+        }
         #[cfg(unix)]
-        Message::OpenDisc(path) => {
+        Message::OpenDiscMounted(path) => {
             resolve_mounted_disc(&mut args, path);
             run_args(args)
         }
@@ -96,8 +151,6 @@ fn update(_state: &mut AppState, message: Message) -> Task<Message> {
             resolve_image(&mut args, path);
             run_args(args)
         }
-        #[cfg(windows)]
-        OpenRawDiscPicker => todo!(), // Does not use rfd
         #[cfg(unix)]
         Message::OpenDiscDirectory => open_disc_folder(),
         Message::OpenImageFile => open_image_file(),
@@ -105,10 +158,31 @@ fn update(_state: &mut AppState, message: Message) -> Task<Message> {
     }
 }
 
-fn view(_state: &AppState) -> Element<'_, Message> {
+#[allow(unused_variables)]
+fn view(state: &AppState) -> Element<'_, Message> {
+    #[cfg(windows)]
+    if state.show_drive_picker {
+        let mut col = column![text("Select disc drive:")].spacing(10);
+        for drive in &state.drives {
+            col =
+                col.push(button(format!("Drive {drive}:")).on_press(Message::OpenDiscRaw(*drive)));
+        }
+        col = col.push(button("Cancel").on_press(Message::DrivePickerClosed));
+        return container(col)
+            .padding(10)
+            .center_x(Fill)
+            .center_y(Fill)
+            .into();
+    }
+
+    #[cfg(windows)]
+    let open_disc_button = button("Open Disc").on_press(Message::OpenDrivePicker);
+    #[cfg(unix)]
+    let open_disc_button = button("Open Disc").on_press(Message::OpenDiscDirectory);
+
     container(
         row![
-            button("Open Disc").on_press(Message::OpenDiscDirectory),
+            open_disc_button,
             button("Open Image").on_press(Message::OpenImageFile)
         ]
         .spacing(10),
@@ -143,7 +217,6 @@ pub(crate) fn resolve_mounted_disc(args: &mut Args, path: PathBuf) {
 #[allow(unused)]
 pub(crate) fn resolve_raw_disc(args: &mut Args, drive_letter: char) {
     let path = PathBuf::from(format!("\\\\.\\{drive_letter}:"));
-    dbg!(&path);
 
     args.location = Some(path);
     args.set_raw_disc(true);
