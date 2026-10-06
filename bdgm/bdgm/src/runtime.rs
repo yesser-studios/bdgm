@@ -32,8 +32,8 @@ impl Display for Runtime {
 
 impl Runtime {
     /// Creates a `Runtime` from the value of the `runtime` field of `DISC.BDGM`.
-    pub fn from_str(str: &str) -> Option<Self> {
-        match str {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
             "java" => Some(Self::Java),
             "dotnet" => Some(Self::Dotnet),
             "python" => Some(Self::Python),

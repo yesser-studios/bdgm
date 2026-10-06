@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use crate::{
@@ -43,22 +44,23 @@ impl Game {
             runtime_args: Vec::new(),
         }
     }
+}
+
+impl FromStr for Game {
+    type Err = anyhow::Error;
 
     /// Parses a `Game` from `DISC.BDGM` file contents.
-    pub fn from_str(str: &str) -> anyhow::Result<Game> {
+    fn from_str(s: &str) -> Result<Game, Self::Err> {
         let mut result = Game::new();
 
-        let mut lines = str.lines();
+        let mut lines = s.lines();
         result.bdgm_version = match lines.next() {
             Some(header) => {
                 let split: Vec<_> = header.split('/').collect();
-                if split.len() != 2 || split.get(0).is_none_or(|x| *x != "BDGM") {
+                if split.len() != 2 || split.first().is_none_or(|x| *x != "BDGM") {
                     return Err(Error::from(ParserError::InvalidHeader));
                 }
-                match split.get(1) {
-                    Some(x) => Some(x.to_string()),
-                    None => None,
-                }
+                split.get(1).map(|x| x.to_string())
             }
             None => None,
         };
@@ -170,7 +172,7 @@ impl ValidatedGame {
         let args = game.args;
         let runtime = match game.runtime {
             Some(runtime_string) => {
-                let runtime = Runtime::from_str(&runtime_string);
+                let runtime = Runtime::from_name(&runtime_string);
                 if runtime.is_none() {
                     errors.add(BDGMError::RuntimeInvalid(runtime_string));
                 }
@@ -226,8 +228,8 @@ impl ValidatedGame {
             }
         }
 
-        if let Some(runtime) = &runtime {
-            if *runtime != Runtime::Windows
+        if let Some(runtime) = &runtime
+            && *runtime != Runtime::Windows
                 && *runtime != Runtime::HTML
                 && runtime_version.is_none()
             {
@@ -235,7 +237,6 @@ impl ValidatedGame {
                     "runtime_version".to_string(),
                 ));
             }
-        }
 
         let executable: Option<PathBuf> = if !executable.is_empty() {
             if executable.contains('\\') {
@@ -369,7 +370,7 @@ impl From<ValidatedGame> for Game {
 #[cfg(test)]
 mod test {
     use std::io::Write;
-    use std::{fs::File, io::Read};
+    use std::{fs::File, io::Read, str::FromStr};
 
     use crate::game::ValidatedGame;
     use crate::{game::Game, runtime::Runtime};

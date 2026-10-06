@@ -2,6 +2,7 @@ use std::{
     fs,
     io::{self, Read},
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 pub use hadris_udf::UdfRevision;

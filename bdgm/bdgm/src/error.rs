@@ -105,7 +105,7 @@ impl BDGMErrors {
 
     /// Returns `Ok` if the set contains no errors, otherwise returns `Err(self)`.
     pub fn evaluate(self) -> Result<(), Self> {
-        if self.0.len() > 0 { Err(self) } else { Ok(()) }
+        if !self.0.is_empty() { Err(self) } else { Ok(()) }
     }
 }
 
