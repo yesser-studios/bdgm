@@ -2,12 +2,13 @@ use std::{path::PathBuf, process::ExitStatus};
 
 use bdgm_play::{args::Args, image::resolve_image_args, run_sanitized};
 #[cfg(windows)]
-use iced::widget::{column, text};
+use iced::widget::column;
 use iced::{
     Element,
     Length::Fill,
     Task, Theme,
-    widget::{button, container, row},
+    font::{Font, Weight},
+    widget::{button, container, row, text, text::Text},
 };
 use rfd::{AsyncFileDialog, FileHandle};
 
@@ -158,16 +159,34 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
     }
 }
 
+const BUTTON_TEXT_SIZE: f32 = 20.0;
+
+fn button_text<'a>(label: impl Into<String>) -> Text<'a> {
+    text(label.into()).size(BUTTON_TEXT_SIZE).font(Font {
+        weight: Weight::Bold,
+        ..Font::DEFAULT
+    })
+}
+
+fn centered_label<'a>(label: impl Into<String>) -> Element<'a, Message> {
+    container(button_text(label))
+        .center_x(Fill)
+        .center_y(Fill)
+        .into()
+}
+
 #[allow(unused_variables)]
 fn view(state: &AppState) -> Element<'_, Message> {
     #[cfg(windows)]
     if state.show_drive_picker {
         let mut col = column![text("Select disc drive:")].spacing(10);
         for drive in &state.drives {
-            col =
-                col.push(button(format!("Drive {drive}:")).on_press(Message::OpenDiscRaw(*drive)));
+            col = col.push(
+                button(button_text(format!("Drive {drive}:")))
+                    .on_press(Message::OpenDiscRaw(*drive)),
+            );
         }
-        col = col.push(button("Cancel").on_press(Message::DrivePickerClosed));
+        col = col.push(button(button_text("Cancel")).on_press(Message::DrivePickerClosed));
         return container(col)
             .padding(10)
             .center_x(Fill)
@@ -176,14 +195,20 @@ fn view(state: &AppState) -> Element<'_, Message> {
     }
 
     #[cfg(windows)]
-    let open_disc_button = button("Open Disc").on_press(Message::OpenDrivePicker);
+    let open_disc_button = button(button_text("Open Disc")).on_press(Message::OpenDrivePicker);
     #[cfg(unix)]
-    let open_disc_button = button("Open Disc").on_press(Message::OpenDiscDirectory);
+    let open_disc_button = button(centered_label("Open Disc"))
+        .width(150)
+        .height(150)
+        .on_press(Message::OpenDiscDirectory);
 
     container(
         row![
             open_disc_button,
-            button("Open Image").on_press(Message::OpenImageFile)
+            button(centered_label("Open Image"))
+                .width(150)
+                .height(150)
+                .on_press(Message::OpenImageFile)
         ]
         .spacing(10),
     )
@@ -195,7 +220,7 @@ fn view(state: &AppState) -> Element<'_, Message> {
 
 pub fn run_gui(_args: Args) -> iced::Result {
     iced::application(new, update, view)
-        .theme(|_: &AppState| Theme::Dark)
+        .theme(|_: &AppState| Theme::CatppuccinMocha)
         .run()
 }
 
