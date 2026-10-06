@@ -15,7 +15,12 @@ pub(crate) fn extract_path(file: Option<FileHandle>) -> Option<PathBuf> {
 
 #[cfg(windows)]
 pub(crate) fn list_candidate_drives() -> Vec<char> {
-    use windows_sys::Win32::Storage::FileSystem::{DRIVE_CDROM, GetDriveTypeW, GetLogicalDrives};
+    use windows_sys::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
+
+    // windows-sys does not export DRIVE_* constants, so define locally.
+    // Values from Win32 fileapi.h: 0 UNKNOWN, 1 NO_ROOT, 2 REMOVABLE,
+    // 3 FIXED, 4 REMOTE, 5 CDROM, 6 RAMDISK.
+    const DRIVE_CDROM: u32 = 5;
 
     // SAFETY: GetLogicalDrives takes no args and returns a bitmask.
     let mask = unsafe { GetLogicalDrives() };

@@ -52,13 +52,15 @@ pub(crate) fn view(state: &AppState) -> Element<'_, Message> {
 
 #[cfg(windows)]
 fn drive_picker_view(state: &AppState) -> Element<'_, Message> {
-    let mut col = column![text("Select disc drive:")].spacing(10);
+    let mut col = iced::widget::column![text("Select disc drive:")].spacing(10);
     for drive in &state.drives {
         col = col.push(
-            button(button_text(format!("Drive {drive}:"))).on_press(Message::OpenDiscRaw(*drive)),
+            iced::widget::button(button_text(format!("Drive {drive}:")))
+                .on_press(Message::OpenDiscRaw(*drive)),
         );
     }
-    col = col.push(button(button_text("Cancel")).on_press(Message::DrivePickerClosed));
+    col =
+        col.push(iced::widget::button(button_text("Cancel")).on_press(Message::DrivePickerClosed));
     container(col)
         .padding(10)
         .center_x(Fill)
