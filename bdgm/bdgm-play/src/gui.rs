@@ -16,7 +16,7 @@ use bdgm_play::{
 #[cfg(windows)]
 use iced::widget::column;
 use iced::{
-    Element,
+    Alignment, Element,
     Length::Fill,
     Task, Theme,
     font::{Font, Weight},
@@ -494,7 +494,8 @@ fn game_modal<'a>(info: &'a GameInfo) -> Element<'a, Message> {
         text(format!("ID: {}", info.id)).size(14),
     ]
     .spacing(4)
-    .padding(16);
+    .padding(16)
+    .align_x(Alignment::Center);
 
     if let Some(url) = &info.url {
         card = card.push(text(format!("Serving at {url}")).size(14));
@@ -508,7 +509,7 @@ fn game_modal<'a>(info: &'a GameInfo) -> Element<'a, Message> {
         .spacing(10),
     );
 
-    container(card).padding(8).into()
+    container(card).padding(8).width(Fill).center_x(Fill).into()
 }
 
 #[allow(unused_variables)]
@@ -559,7 +560,8 @@ fn view(state: &AppState) -> Element<'_, Message> {
 
     let mut main = iced::widget::column![row![open_disc_button, open_image_button].spacing(10),]
         .spacing(10)
-        .padding(10);
+        .padding(10)
+        .align_x(Alignment::Center);
 
     match state.phase {
         Phase::Idle if state.status.is_empty() => {}
