@@ -126,7 +126,7 @@ impl Default for AppState {
             #[cfg(windows)]
             drives: Vec::new(),
             phase: Phase::Idle,
-            status: String::from("Pick a disc or image to start."),
+            status: String::from(""),
             starting_slot: None,
             playing_info: None,
             playing_handle: None,
@@ -461,7 +461,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 None => {
                     state.playing_tempdir = None;
                     state.phase = Phase::Idle;
-                    state.status = String::from("Pick a disc or image to start.");
+                    state.status = String::from("");
                     Task::none()
                 }
             }
@@ -490,18 +490,8 @@ fn centered_label<'a>(label: impl Into<String>) -> Element<'a, Message> {
 // — all data comes from `AppState::playing_info: Option<GameInfo>`.
 fn game_modal<'a>(info: &'a GameInfo) -> Element<'a, Message> {
     let mut card = iced::widget::column![
-        text(format!("Running: {}", info.name)).size(22),
-        text(format!("ID: {}   Version: {}", info.id, info.version)).size(14),
-        text(format!("Executable: {}", info.executable)).size(14),
-        text(format!(
-            "Runtime: {}{}",
-            info.runtime,
-            info.runtime_version
-                .as_ref()
-                .map(|v| format!(" ({v})"))
-                .unwrap_or_default()
-        ))
-        .size(14),
+        text(format!("Running: {} version {}", info.name, info.version)).size(22),
+        text(format!("ID: {}", info.id)).size(14),
     ]
     .spacing(4)
     .padding(16);
@@ -567,21 +557,19 @@ fn view(state: &AppState) -> Element<'_, Message> {
             Some(Message::OpenImageFile)
         });
 
-    let mut main = iced::widget::column![
-        row![open_disc_button, open_image_button].spacing(10),
-        text(state.status.clone()).size(14),
-    ]
-    .spacing(10)
-    .padding(10);
+    let mut main = iced::widget::column![row![open_disc_button, open_image_button].spacing(10),]
+        .spacing(10)
+        .padding(10);
 
-    // Popup shown after starting a game. Closing it (Stop/Close) kills the
-    // child process or aborts the HTML server; it hides itself on GameExited.
-    if state.phase == Phase::Playing {
-        if let Some(info) = &state.playing_info {
-            main = main.push(game_modal(info));
+    match state.phase {
+        Phase::Idle if state.status.is_empty() => {}
+        Phase::Idle => main = main.push(text(state.status.clone()).size(14)),
+        Phase::Starting => main = main.push(text("Starting game...").size(14)),
+        Phase::Playing => {
+            if let Some(info) = &state.playing_info {
+                main = main.push(game_modal(info));
+            }
         }
-    } else if state.phase == Phase::Starting {
-        main = main.push(text("Starting game...").size(14));
     }
 
     container(main).center_x(Fill).center_y(Fill).into()
