@@ -6,23 +6,21 @@ use std::{
 
 use fs_extra::dir;
 
-use crate::error::IoError;
+use crate::core::error::IoError;
 
 pub fn acquire_lock(path: &Path, blocking: bool, verbose: bool) -> Result<File, IoError> {
-    match path.parent() {
-        Some(dir_path) => {
-            if dir_path.exists() && !dir_path.is_dir() {
-                return Err(IoError::IoError(io::Error::new(
-                    io::ErrorKind::NotADirectory,
-                    format!(
-                        "Parent of {} (which was attempted to lock) exists but is not a directory",
-                        path.display()
-                    ),
-                )));
-            }
-            dir::create_all(dir_path, false)?;
+    // If the parent does not exist, locking will probably fail, but we'll still try.
+    if let Some(dir_path) = path.parent() {
+        if dir_path.exists() && !dir_path.is_dir() {
+            return Err(IoError::IoError(io::Error::new(
+                io::ErrorKind::NotADirectory,
+                format!(
+                    "Parent of {} (which was attempted to lock) exists but is not a directory",
+                    path.display()
+                ),
+            )));
         }
-        None => {} // Parent does not exist so locking will probably fail, but we'll still try
+        dir::create_all(dir_path, false)?;
     }
 
     let file = get_file(&path.with_added_extension("lock"))?;
@@ -46,10 +44,13 @@ pub fn acquire_lock(path: &Path, blocking: bool, verbose: bool) -> Result<File, 
 }
 
 pub fn get_file(path: &Path) -> io::Result<File> {
+    // truncate(false): callers such as `load_ports` read existing contents
+    // through this handle, so opening must never discard them.
     File::options()
         .write(true)
         .read(true)
         .create(true)
+        .truncate(false)
         .open(path)
 }
 

@@ -4,16 +4,18 @@ use bdgm::game::ValidatedGame;
 use fs_extra::dir::{self, CopyOptions};
 use platform_dirs::AppDirs;
 
-use crate::{args::Args, dirs::get_app_dir_path, error::IoError, fs::acquire_lock};
+use crate::{
+    cli::args::Args, core::dirs::get_app_dir_path, core::error::IoError, core::fs::acquire_lock,
+};
 
 pub fn install(game: &ValidatedGame, app_dirs: &AppDirs, args: &Args) -> anyhow::Result<()> {
     let id = game.id();
-    let game_dir = app_dirs.data_dir.join(&id);
+    let game_dir = app_dirs.data_dir.join(id);
     let install_dir = game_dir.join("app").join(game.version());
     let install_part_dir = install_dir.with_added_extension("part");
     if !install_dir.try_exists()? {
         let lock = acquire_lock(&install_dir, false, false).map_err(|e| match e {
-            crate::error::IoError::TryLockError(try_lock_error) => io::Error::new(
+            crate::core::error::IoError::TryLockError(try_lock_error) => io::Error::new(
                 io::ErrorKind::ResourceBusy,
                 format!("An installation is in progress: {}", try_lock_error),
             )

@@ -4,8 +4,8 @@ use bdgm::{error::BDGMError, game::ValidatedGame};
 use platform_dirs::AppDirs;
 
 use crate::{
-    args::Args,
-    error::{
+    cli::args::Args,
+    core::error::{
         AppError,
         IoError::{self},
     },
@@ -20,9 +20,9 @@ pub struct GameDirs {
 
 impl GameDirs {
     pub fn from(game: &ValidatedGame, app_dirs: &AppDirs) -> Self {
-        let root = app_dirs.data_dir.join(&game.id());
+        let root = app_dirs.data_dir.join(game.id());
         let install = root.join("app").join(game.version());
-        let cache = app_dirs.cache_dir.join(&game.id());
+        let cache = app_dirs.cache_dir.join(game.id());
         let data = root.join("data");
 
         GameDirs {
@@ -44,7 +44,7 @@ pub fn try_get_executable_path(args: &Args, game: &ValidatedGame) -> anyhow::Res
         None => return Err(IoError::PathNone.into()),
     };
 
-    let executable_path = app_dir_path.join(&game.executable());
+    let executable_path = app_dir_path.join(game.executable());
 
     if !executable_path.try_exists()? {
         return Err(AppError::InvalidGameFile(BDGMError::ExecutableMissing(

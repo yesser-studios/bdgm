@@ -7,9 +7,11 @@ use platform_dirs::AppDirs;
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::{
-    args::Args,
-    dirs::{GameDirs, get_app_dir_path},
-    server::play_html_game,
+    cli::args::Args,
+    core::{
+        dirs::{GameDirs, get_app_dir_path},
+        server::play_html_game,
+    },
 };
 
 pub fn get_envvars(
@@ -43,9 +45,9 @@ pub async fn launch_game(
     app_dirs: &AppDirs,
     verbose: bool,
 ) -> anyhow::Result<ExitStatus> {
-    let envvars = get_envvars(&game, &args, &app_dirs);
+    let envvars = get_envvars(game, args, app_dirs);
     let runtime = game.runtime();
-    let game_dirs = GameDirs::from(&game, &app_dirs);
+    let game_dirs = GameDirs::from(game, app_dirs);
     let runtime_path = args
         .runtime
         .as_ref()
@@ -75,7 +77,7 @@ pub async fn launch_game(
             .current_dir(&game_dirs.install)
             .status()?,
         bdgm::runtime::Runtime::HTML => {
-            play_html_game(&game, &game_dirs.install, app_dirs, verbose).await?;
+            play_html_game(game, &game_dirs.install, app_dirs, verbose).await?;
             std::process::ExitStatus::default()
         }
         bdgm::runtime::Runtime::Windows => {
@@ -97,12 +99,11 @@ pub async fn launch_game(
             }
         }
     };
-    if !status.success() {
-        if verbose {
+    if !status.success()
+        && verbose {
             eprintln!("Your game crashed: {status}");
             eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
         }
-    }
 
     Ok(status)
 }

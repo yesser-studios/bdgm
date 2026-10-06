@@ -3,10 +3,10 @@ use std::fs::File;
 use hadris_udf::UdfVolume;
 use tempfile::{TempDir, tempdir};
 
-use crate::{args::Args, dump::extract_udf_dir, error::IoError};
+use crate::{cli::args::Args, core::dump::extract_udf_dir, core::error::IoError};
 
 #[cfg(windows)]
-use crate::dump::dump_disc;
+use crate::core::dump::dump_disc;
 #[cfg(windows)]
 use tempfile::NamedTempFile;
 

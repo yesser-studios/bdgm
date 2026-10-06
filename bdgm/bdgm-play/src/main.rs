@@ -1,10 +1,8 @@
-use bdgm_play::args::Args;
+use bdgm_play::{
+    cli::{app::run, args::Args},
+    gui::app::run_gui,
+};
 use clap::Parser;
-
-use crate::{app::run, gui::run_gui};
-
-mod app;
-mod gui;
 
 fn main() {
     let args = Args::parse();

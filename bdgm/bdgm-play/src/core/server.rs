@@ -13,7 +13,7 @@ use platform_dirs::AppDirs;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
-use crate::{
+use crate::core::{
     error::AppError,
     fs::{acquire_lock, get_file, get_part_file, truncate},
 };
@@ -37,9 +37,9 @@ pub async fn serve(listener: TcpListener, directory: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-const PORTLIST_FILE_NAME: &'static str = "ports.json";
+const PORTLIST_FILE_NAME: &str = "ports.json";
 
-pub fn get_portlist_file_path(data_dir: &PathBuf) -> PathBuf {
+pub fn get_portlist_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join(PORTLIST_FILE_NAME)
 }
 
@@ -118,7 +118,7 @@ pub async fn start_html_server(
             let mut port = listener.local_addr()?.port();
 
             let mut tries = 0;
-            while ports.get_by_right(&&port).is_some() {
+            while ports.get_by_right(&port).is_some() {
                 listener = create_listener(None).await?;
                 port = listener.local_addr()?.port();
 
@@ -139,7 +139,7 @@ pub async fn start_html_server(
     };
 
     let executable = game.executable().to_string_lossy();
-    let encoded = utf8_percent_encode(&executable, &ENCODE_SET);
+    let encoded = utf8_percent_encode(&executable, ENCODE_SET);
 
     let address = format!("http://{}/{}", listener.local_addr()?, encoded);
     if verbose {
@@ -166,7 +166,7 @@ pub async fn start_html_server(
 
 pub async fn play_html_game(
     game: &ValidatedGame,
-    install_dir: &PathBuf,
+    install_dir: &Path,
     app_dirs: &AppDirs,
     verbose: bool,
 ) -> anyhow::Result<()> {
