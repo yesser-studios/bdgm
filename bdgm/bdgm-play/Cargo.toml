@@ -25,7 +25,7 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 axum = "0.8"
-tokio = { version = "1", features = [ "macros", "rt-multi-thread", "net" ] }
+tokio = { version = "1", features = [ "macros", "rt-multi-thread", "net", "process", "sync", "time" ] }
 tower-http = { version = "0.6", features = [ "fs" ] }
 percent-encoding = "2"
 
