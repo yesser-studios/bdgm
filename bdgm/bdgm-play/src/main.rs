@@ -6,12 +6,17 @@ use crate::{app::run, gui::run_gui};
 mod app;
 mod gui;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args = Args::parse();
 
     let status = match args.location {
-        Some(_) => run(args).await.map(Some),
+        Some(_) => match tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime.block_on(run(args)).map(Some),
+            Err(e) => Err(e.into()),
+        },
         None => {
             if args.is_raw_disc() {
                 eprintln!(
