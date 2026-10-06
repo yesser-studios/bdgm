@@ -1,7 +1,7 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    widget::{button, container, row, text},
+    widget::{button, container, text},
 };
 
 use crate::gui::{message::Message, state::GameInfo};
@@ -23,13 +23,7 @@ pub(super) fn game_modal<'a>(info: &'a GameInfo) -> Element<'a, Message> {
         card = card.push(text(format!("Serving at {url}")).size(14));
     }
 
-    card = card.push(
-        row![
-            button(button_text("Stop")).on_press(Message::StopGame),
-            button(button_text("Close")).on_press(Message::StopGame),
-        ]
-        .spacing(10),
-    );
+    card = card.push(button(button_text("Stop")).on_press(Message::StopGame));
 
     container(card).padding(8).width(Fill).center_x(Fill).into()
 }
