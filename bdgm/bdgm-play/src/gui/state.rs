@@ -91,6 +91,9 @@ pub(crate) struct AppState {
     pub(crate) drives: Vec<char>,
     pub(crate) phase: Phase,
     pub(crate) status: String,
+    /// Raw-disc dump progress as `(sectors_done, sectors_total)`.
+    /// `Some` while dumping on Windows; `None` otherwise.
+    pub(crate) dump_progress: Option<(u64, u64)>,
     pub(crate) starting_slot: Option<Slot>,
     pub(crate) playing_info: Option<GameInfo>,
     pub(crate) playing_handle: Option<PlayHandle>,
@@ -106,6 +109,7 @@ impl Default for AppState {
             drives: Vec::new(),
             phase: Phase::Idle,
             status: String::from(""),
+            dump_progress: None,
             starting_slot: None,
             playing_info: None,
             playing_handle: None,

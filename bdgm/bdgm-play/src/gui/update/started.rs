@@ -19,6 +19,7 @@ pub(super) fn handle_game_started(
 }
 
 fn handle_game_started_ok(state: &mut AppState) -> Task<Message> {
+    state.dump_progress = None;
     let Some(session) = take_starting_session(state) else {
         state.phase = Phase::Idle;
         state.status = String::from("Game started but session was lost.");
@@ -35,6 +36,7 @@ fn handle_game_started_ok(state: &mut AppState) -> Task<Message> {
 }
 
 fn handle_game_started_err(state: &mut AppState, err: String) -> Task<Message> {
+    state.dump_progress = None;
     state.starting_slot = None;
     state.phase = Phase::Idle;
     state.status = format!("Failed to start: {err}");

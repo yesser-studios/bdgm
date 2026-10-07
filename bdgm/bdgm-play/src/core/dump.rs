@@ -118,7 +118,11 @@ fn disc_size(file: &File) -> io::Result<u64> {
 }
 
 #[cfg(windows)]
-pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
+pub fn dump_disc_with_progress(
+    drive: &str,
+    output: &str,
+    mut on_progress: impl FnMut(u64, u64),
+) -> io::Result<()> {
     let mut drive = OpenOptions::new()
         .read(true)
         .custom_flags(FILE_FLAG_NO_BUFFERING)
@@ -163,6 +167,10 @@ pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
         drive.read_exact(&mut buffer)?;
         output.write_all(&buffer)?;
 
+        if sector % 512 == 0 || sector + 1 == sectors_to_copy {
+            on_progress(sector + 1, sectors_to_copy);
+        }
+
         if sector % 1024 == 0 {
             println!(
                 "{}/{} sectors ({:.1}%)",
@@ -176,6 +184,11 @@ pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     output.flush()?;
 
     Ok(())
+}
+
+#[cfg(windows)]
+pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
+    dump_disc_with_progress(drive, output, |_, _| {})
 }
 
 pub fn extract_udf_dir(

@@ -1,7 +1,6 @@
 use iced::{
-    Alignment, Element,
-    Length::Fill,
-    widget::{container, row, text},
+    Alignment, Element, Length,
+    widget::{ProgressBar, container, row, text},
 };
 
 use super::{
@@ -39,7 +38,17 @@ pub(crate) fn view(state: &AppState) -> Element<'_, Message> {
     match state.phase {
         Phase::Idle if state.status.is_empty() => {}
         Phase::Idle => main = main.push(text(state.status.clone()).size(14)),
-        Phase::Starting => main = main.push(text("Starting game...").size(14)),
+        Phase::Starting => {
+            main = main.push(text(state.status.clone()).size(14));
+            if let Some((done, total)) = state.dump_progress {
+                let fraction = if total > 0 {
+                    (done as f32 / total as f32).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                main = main.push(ProgressBar::new(0.0..=1.0, fraction).length(350));
+            }
+        }
         Phase::Playing => {
             if let Some(info) = &state.playing_info {
                 main = main.push(game_modal(info));
@@ -47,7 +56,10 @@ pub(crate) fn view(state: &AppState) -> Element<'_, Message> {
         }
     }
 
-    container(main).center_x(Fill).center_y(Fill).into()
+    container(main)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
 }
 
 #[cfg(windows)]
@@ -65,7 +77,7 @@ fn drive_picker_view(state: &AppState) -> Element<'_, Message> {
         col.push(iced::widget::button(button_text("Cancel")).on_press(Message::DrivePickerClosed));
     container(col)
         .padding(10)
-        .center_x(Fill)
-        .center_y(Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
         .into()
 }

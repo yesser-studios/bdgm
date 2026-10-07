@@ -5,6 +5,7 @@ use crate::gui::{message::Message, state::AppState};
 mod disc;
 mod exited;
 mod image;
+mod progress;
 mod started;
 mod stop;
 
@@ -19,6 +20,7 @@ pub(crate) fn update(state: &mut AppState, message: Message) -> Task<Message> {
         #[cfg(unix)]
         Message::OpenDiscMounted(path) => disc::handle_open_disc_mounted(state, path),
         Message::OpenImage(path) => image::handle_open_image(state, path),
+        Message::DumpProgress(done, total) => progress::handle_dump_progress(state, done, total),
         #[cfg(unix)]
         Message::OpenDiscDirectory => disc::handle_open_disc_directory(state),
         Message::OpenImageFile => image::handle_open_image_file(state),

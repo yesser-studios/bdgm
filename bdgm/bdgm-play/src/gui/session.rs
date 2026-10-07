@@ -7,7 +7,7 @@ use crate::cli::args::Args;
 use super::{
     message::Message,
     state::{AppState, Slot, StartedSession},
-    tasks::start_game_task,
+    tasks::start_game_stream,
 };
 
 pub(crate) fn is_busy(state: &AppState) -> bool {
@@ -36,7 +36,8 @@ pub(crate) fn begin_launch(state: &mut AppState, args: Args) -> Task<Message> {
     state.starting_slot = Some(Arc::clone(&slot));
     state.phase = super::state::Phase::Starting;
     state.status = String::from("Starting game...");
-    Task::perform(start_game_task(args, slot), Message::GameStarted)
+    state.dump_progress = None;
+    Task::stream(start_game_stream(args, slot))
 }
 
 pub(crate) fn take_starting_session(state: &mut AppState) -> Option<StartedSession> {

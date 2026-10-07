@@ -6,7 +6,7 @@ use tempfile::{TempDir, tempdir};
 use crate::{cli::args::Args, core::dump::extract_udf_dir, core::error::IoError};
 
 #[cfg(windows)]
-use crate::core::dump::dump_disc;
+use crate::core::dump::dump_disc_with_progress;
 #[cfg(windows)]
 use tempfile::NamedTempFile;
 
@@ -32,6 +32,16 @@ impl ImageState {
 }
 
 pub fn resolve_image_args(args: Args) -> anyhow::Result<(Args, Option<TempDir>)> {
+    resolve_image_args_with_progress(args, |_, _| {})
+}
+
+#[allow(unused_mut)]
+pub fn resolve_image_args_with_progress(
+    args: Args,
+    mut on_progress: impl FnMut(u64, u64) + Send,
+) -> anyhow::Result<(Args, Option<TempDir>)> {
+    #[cfg(not(windows))]
+    let _ = &mut on_progress;
     let image_state = ImageState::from(&args);
 
     let file = match image_state {
@@ -40,9 +50,10 @@ pub fn resolve_image_args(args: Args) -> anyhow::Result<(Args, Option<TempDir>)>
         #[cfg(windows)]
         ImageState::RawDisc => {
             let dump_file = NamedTempFile::new()?;
-            dump_disc(
+            dump_disc_with_progress(
                 &args.location.ok_or(IoError::PathNone)?.to_string_lossy(),
                 &dump_file.path().to_string_lossy(),
+                &mut on_progress,
             )?;
 
             File::open(dump_file.path())?

@@ -16,6 +16,7 @@ pub(crate) enum Message {
     OpenImage(PathBuf),
     #[cfg(windows)]
     DrivePickerClosed,
+    DumpProgress(u64, u64),
     GameStarted(Result<GameInfo, String>),
     GameExited(Result<Option<i32>, String>),
     StopGame,
