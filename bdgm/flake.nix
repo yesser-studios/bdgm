@@ -19,8 +19,6 @@
       let
         pkgs = import nixpkgs { inherit system; };
         naersk' = pkgs.callPackage naersk { };
-        # pkgs.xorg is an attrset, not a derivation — list explicit libs instead.
-        # Covers iced 0.14/wgpu (wayland, X11, GL, fonts) + rfd file dialogs.
         guiBuildInputs = with pkgs; [
           wayland
           libxkbcommon
@@ -29,10 +27,10 @@
           fontconfig
           freetype
           openssl
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXi
-          xorg.libXrandr
+          libX11
+          libXcursor
+          libXi
+          libXrandr
         ];
         mkPackage =
           name: bin-name:
