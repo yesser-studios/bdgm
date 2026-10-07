@@ -52,7 +52,9 @@ pub(crate) fn view(state: &AppState) -> Element<'_, Message> {
 
 #[cfg(windows)]
 fn drive_picker_view(state: &AppState) -> Element<'_, Message> {
-    let mut col = iced::widget::column![text("Select disc drive:")].spacing(10);
+    let mut col = iced::widget::column![text("Select disc drive:")]
+        .spacing(10)
+        .align_x(Alignment::Center);
     for drive in &state.drives {
         col = col.push(
             iced::widget::button(button_text(format!("Drive {drive}:")))
