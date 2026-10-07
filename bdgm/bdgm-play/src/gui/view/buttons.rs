@@ -12,9 +12,10 @@ pub(super) fn open_disc_button(busy: bool) -> Button<'static, Message> {
             None
         } else {
             #[cfg(unix)]
-            return Some(Message::OpenDiscDirectory);
+            let r = Some(Message::OpenDiscDirectory);
             #[cfg(windows)]
-            Some(Message::OpenDrivePicker)
+            let r = Some(Message::OpenDrivePicker);
+            r
         })
 }
 
