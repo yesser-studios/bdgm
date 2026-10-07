@@ -9,6 +9,7 @@ use crate::{
     cli::args::Args,
     core::{
         dirs::{GameDirs, get_app_dir_path},
+        error::RuntimeNotFound,
         server::play_html_game,
     },
 };
@@ -103,6 +104,20 @@ pub fn build_command(
     Ok(cmd)
 }
 
+/// Map a `spawn` I/O error to [`RuntimeNotFound`] when the runtime binary
+/// is missing (`ErrorKind::NotFound`). All other errors pass through.
+///
+/// The native Windows launch (spawning the game exe directly) is excluded:
+/// a `NotFound` there means a missing game file, not a missing runtime.
+fn map_spawn_error(e: std::io::Error, game: &ValidatedGame) -> anyhow::Error {
+    let is_native_windows_launch =
+        cfg!(target_os = "windows") && matches!(game.runtime(), Runtime::Windows);
+    if e.kind() == std::io::ErrorKind::NotFound && !is_native_windows_launch {
+        anyhow::anyhow!(RuntimeNotFound::from_game(game))
+    } else {
+        e.into()
+    }
+}
 /// Run a game to completion, awaiting its exit.
 ///
 /// CLI path: just await this. HTML games are served via
@@ -121,13 +136,18 @@ pub async fn run_game(
             play_html_game(game, &game_dirs.install, app_dirs, verbose).await?;
             std::process::ExitStatus::default()
         }
-        _ => build_command(game, args, app_dirs)?.spawn()?.wait().await?,
-    };
-    if !status.success()
-        && verbose {
-            eprintln!("Your game crashed: {status}");
-            eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
+        _ => {
+            build_command(game, args, app_dirs)?
+                .spawn()
+                .map_err(|e| map_spawn_error(e, game))?
+                .wait()
+                .await?
         }
+    };
+    if !status.success() && verbose {
+        eprintln!("Your game crashed: {status}");
+        eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
+    }
 
     Ok(status)
 }
@@ -154,7 +174,8 @@ pub fn spawn_game_process(
 ) -> anyhow::Result<ProcessHandle> {
     let child = build_command(game, args, app_dirs)?
         .kill_on_drop(true)
-        .spawn()?;
+        .spawn()
+        .map_err(|e| map_spawn_error(e, game))?;
 
     Ok(ProcessHandle {
         child: Arc::new(AsyncMutex::new(child)),

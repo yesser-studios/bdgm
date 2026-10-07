@@ -43,6 +43,19 @@ impl Runtime {
         }
     }
 
+    /// Human-friendly display name for user-facing messages.
+    /// Note: `Windows` maps to `"Wine"` since the native Windows launch
+    /// cannot fail with a missing runtime binary.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Java => "Java",
+            Self::Dotnet => ".NET",
+            Self::Python => "Python",
+            Self::Windows => "Wine",
+            Self::HTML => "HTML",
+        }
+    }
+
     /// Formats all runtimes as a comma-separated `String` of `DISC.BDGM` `runtime` field values.
     pub fn display_all() -> String {
         format!(

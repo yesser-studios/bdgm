@@ -56,3 +56,38 @@ impl From<fs_extra::error::Error> for IoError {
         Self::FsExtraError(value)
     }
 }
+
+/// Error for a missing runtime binary when spawning a game process.
+///
+/// Displays as `Runtime <display name>[ <version>] was not found, is it installed?`.
+#[derive(Debug, Error)]
+pub struct RuntimeNotFound {
+    display: &'static str,
+    version: Option<String>,
+}
+
+impl Display for RuntimeNotFound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.version {
+            Some(version) => write!(
+                f,
+                "Runtime {} {} was not found, is it installed?",
+                self.display, version
+            ),
+            None => write!(
+                f,
+                "Runtime {} was not found, is it installed?",
+                self.display
+            ),
+        }
+    }
+}
+
+impl RuntimeNotFound {
+    pub fn from_game(game: &bdgm::game::ValidatedGame) -> Self {
+        Self {
+            display: game.runtime().display_name(),
+            version: game.runtime_version().map(|s| s.to_owned()),
+        }
+    }
+}
