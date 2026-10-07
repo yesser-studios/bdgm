@@ -11,3 +11,4 @@ devcert.pfx
 .winapp/
 AppX/
 dist/
+*.msix
