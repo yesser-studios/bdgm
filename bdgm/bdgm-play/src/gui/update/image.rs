@@ -13,7 +13,7 @@ use super::super::{
 };
 
 pub(super) fn handle_open_image(state: &mut AppState, path: PathBuf) -> Task<Message> {
-    let mut args = Args::new_imageless(None, None);
+    let mut args = Args::new_imageless(None, state.initial_runtime.clone());
     resolve_image(&mut args, path);
     begin_launch(state, args)
 }

@@ -28,7 +28,7 @@ pub(super) fn handle_open_drive_picker(state: &mut AppState) -> Task<Message> {
 #[cfg(windows)]
 pub(super) fn handle_open_disc_raw(state: &mut AppState, letter: char) -> Task<Message> {
     state.show_drive_picker = false;
-    let mut args = Args::new_imageless(None, None);
+    let mut args = Args::new_imageless(None, state.initial_runtime.clone());
     resolve_raw_disc(&mut args, letter);
     begin_launch(state, args)
 }
@@ -41,7 +41,7 @@ pub(super) fn handle_drive_picker_closed(state: &mut AppState) -> Task<Message> 
 
 #[cfg(unix)]
 pub(super) fn handle_open_disc_mounted(state: &mut AppState, path: PathBuf) -> Task<Message> {
-    let mut args = Args::new_imageless(None, None);
+    let mut args = Args::new_imageless(None, state.initial_runtime.clone());
     resolve_mounted_disc(&mut args, path);
     begin_launch(state, args)
 }

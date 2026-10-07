@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use bdgm::game::ValidatedGame;
 use tempfile::TempDir;
@@ -89,6 +92,8 @@ pub(crate) struct AppState {
     pub(crate) show_drive_picker: bool,
     #[cfg(windows)]
     pub(crate) drives: Vec<char>,
+    /// Runtime override from CLI `--runtime`, preserved across game selection.
+    pub(crate) initial_runtime: Option<PathBuf>,
     pub(crate) phase: Phase,
     pub(crate) status: String,
     /// Raw-disc dump progress as `(sectors_done, sectors_total)`.
@@ -107,6 +112,7 @@ impl Default for AppState {
             show_drive_picker: false,
             #[cfg(windows)]
             drives: Vec::new(),
+            initial_runtime: None,
             phase: Phase::Idle,
             status: String::from(""),
             dump_progress: None,

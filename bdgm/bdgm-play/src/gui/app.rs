@@ -7,12 +7,16 @@ use crate::cli::args::Args;
 
 use super::{state::AppState, update::update, view::view};
 
-fn new() -> AppState {
-    AppState::default()
-}
-
-pub fn run_gui(_args: Args) -> iced::Result {
-    iced::application(new, update, view)
+pub fn run_gui(args: Args) -> iced::Result {
+    let initial_runtime = args.runtime;
+    iced::application(
+        move || AppState {
+            initial_runtime: initial_runtime.clone(),
+            ..AppState::default()
+        },
+        update,
+        view,
+    )
         .theme(|_: &AppState| Theme::CatppuccinMocha)
         .title("BDGM Player")
         .window(window::Settings {

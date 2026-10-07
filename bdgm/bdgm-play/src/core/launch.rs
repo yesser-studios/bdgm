@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::ExitStatus, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, process::ExitStatus, sync::Arc};
 
 use bdgm::game::ValidatedGame;
 use bdgm::runtime::Runtime;
@@ -109,11 +109,18 @@ pub fn build_command(
 ///
 /// The native Windows launch (spawning the game exe directly) is excluded:
 /// a `NotFound` there means a missing game file, not a missing runtime.
-fn map_spawn_error(e: std::io::Error, game: &ValidatedGame) -> anyhow::Error {
+fn map_spawn_error(
+    e: std::io::Error,
+    game: &ValidatedGame,
+    runtime: Option<&PathBuf>,
+) -> anyhow::Error {
     let is_native_windows_launch =
         cfg!(target_os = "windows") && matches!(game.runtime(), Runtime::Windows);
     if e.kind() == std::io::ErrorKind::NotFound && !is_native_windows_launch {
-        anyhow::anyhow!(RuntimeNotFound::from_game(game))
+        match runtime {
+            Some(p) => anyhow::anyhow!(RuntimeNotFound::from_path(p, None)),
+            None => anyhow::anyhow!(RuntimeNotFound::from_game(game)),
+        }
     } else {
         e.into()
     }
@@ -139,14 +146,14 @@ pub async fn run_game(
         _ => {
             build_command(game, args, app_dirs)?
                 .spawn()
-                .map_err(|e| map_spawn_error(e, game))?
+                .map_err(|e| map_spawn_error(e, game, args.runtime.as_ref()))?
                 .wait()
                 .await?
         }
     };
     if !status.success() && verbose {
         eprintln!("Your game crashed: {status}");
-        eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
+        eprintln!("Specifying a runtime with `--runtime /path/to/runtime` may fix your issue.");
     }
 
     Ok(status)
@@ -175,7 +182,7 @@ pub fn spawn_game_process(
     let child = build_command(game, args, app_dirs)?
         .kill_on_drop(true)
         .spawn()
-        .map_err(|e| map_spawn_error(e, game))?;
+        .map_err(|e| map_spawn_error(e, game, args.runtime.as_ref()))?;
 
     Ok(ProcessHandle {
         child: Arc::new(AsyncMutex::new(child)),

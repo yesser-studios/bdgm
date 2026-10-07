@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs, io};
+use std::{fmt::Display, fs, io, path::Path};
 
 use bdgm::error::BDGMError;
 use thiserror::Error;
@@ -62,7 +62,7 @@ impl From<fs_extra::error::Error> for IoError {
 /// Displays as `Runtime <display name>[ <version>] was not found, is it installed?`.
 #[derive(Debug, Error)]
 pub struct RuntimeNotFound {
-    display: &'static str,
+    display: String,
     version: Option<String>,
 }
 
@@ -86,8 +86,15 @@ impl Display for RuntimeNotFound {
 impl RuntimeNotFound {
     pub fn from_game(game: &bdgm::game::ValidatedGame) -> Self {
         Self {
-            display: game.runtime().display_name(),
+            display: game.runtime().display_name().to_string(),
             version: game.runtime_version().map(|s| s.to_owned()),
+        }
+    }
+
+    pub fn from_path(path: &Path, version: Option<String>) -> Self {
+        Self {
+            display: path.display().to_string(),
+            version,
         }
     }
 }
