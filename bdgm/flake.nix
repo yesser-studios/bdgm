@@ -29,10 +29,10 @@
           fontconfig
           freetype
           openssl
-          libx11
-          libxcursor
-          libxi
-          libxrandr
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXi
+          xorg.libXrandr
         ];
         mkPackage =
           name: bin-name:
@@ -70,7 +70,7 @@
           buildInputs = guiBuildInputs;
 
           shellHook = ''
-            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath guiBuildInputs}:$LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath guiBuildInputs}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
           '';
         };
       }
