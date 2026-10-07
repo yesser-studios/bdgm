@@ -1,5 +1,6 @@
 pub mod app;
 mod args_resolve;
+pub mod console;
 mod dialogs;
 mod message;
 mod session;
