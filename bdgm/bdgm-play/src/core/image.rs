@@ -31,10 +31,6 @@ impl ImageState {
     }
 }
 
-pub fn resolve_image_args(args: Args) -> anyhow::Result<(Args, Option<TempDir>)> {
-    resolve_image_args_with_progress(args, |_, _| {})
-}
-
 #[allow(unused_mut)]
 pub fn resolve_image_args_with_progress(
     args: Args,

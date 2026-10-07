@@ -91,11 +91,8 @@ pub struct HtmlServerHandle {
 /// Start an HTML game server without blocking, returning a handle that can
 /// be aborted to free the port.
 ///
-/// This contains the port persistence + bind + browser-open logic shared by
-/// the CLI (`play_html_game`) and the GUI popup. Aborting the returned
-/// handle stops the server so the same persisted port can be rebound on
-/// the next launch (previously the server future never returned, causing
-/// `EADDRINUSE` on second launch without an app restart).
+/// Killable primitive for the GUI modal (abort the handle on Stop).
+/// The CLI path just awaits via `play_html_game` (used by `launch::run_game`).
 pub async fn start_html_server(
     game: &ValidatedGame,
     install_dir: &Path,
@@ -164,6 +161,11 @@ pub async fn start_html_server(
     })
 }
 
+/// Start an HTML game and await its server future until it exits.
+///
+/// CLI convenience wrapper over `start_html_server`: start + await.
+/// Aborting the returned handle stops the server so the same persisted
+/// port can be rebound on the next launch.
 pub async fn play_html_game(
     game: &ValidatedGame,
     install_dir: &Path,

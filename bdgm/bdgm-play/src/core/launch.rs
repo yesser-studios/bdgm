@@ -1,8 +1,7 @@
 use std::{collections::HashMap, process::ExitStatus, sync::Arc};
 
-use std::process::Command;
-
 use bdgm::game::ValidatedGame;
+use bdgm::runtime::Runtime;
 use platform_dirs::AppDirs;
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -39,97 +38,16 @@ pub fn get_envvars(
     envvars
 }
 
-pub async fn launch_game(
+/// Build the async command for a native (non-HTML) game.
+///
+/// Single place for runtime dispatch shared by `run_game` (CLI, awaited)
+/// and `spawn_game_process` (GUI, killable). Returns an error for HTML
+/// games — use `server::start_html_server` instead.
+pub fn build_command(
     game: &ValidatedGame,
     args: &Args,
     app_dirs: &AppDirs,
-    verbose: bool,
-) -> anyhow::Result<ExitStatus> {
-    let envvars = get_envvars(game, args, app_dirs);
-    let runtime = game.runtime();
-    let game_dirs = GameDirs::from(game, app_dirs);
-    let runtime_path = args
-        .runtime
-        .as_ref()
-        .map(|x| x.to_string_lossy().to_string());
-
-    let status = match runtime {
-        bdgm::runtime::Runtime::Java => Command::new(runtime_path.as_deref().unwrap_or("java"))
-            .args(game.runtime_args())
-            .arg("-jar")
-            .arg(game_dirs.install.join(game.executable()))
-            .args(game.args())
-            .envs(envvars)
-            .current_dir(&game_dirs.install)
-            .status()?,
-        bdgm::runtime::Runtime::Dotnet => Command::new(runtime_path.as_deref().unwrap_or("dotnet"))
-            .args(game.runtime_args())
-            .arg(game_dirs.install.join(game.executable()))
-            .args(game.args())
-            .envs(envvars)
-            .current_dir(&game_dirs.install)
-            .status()?,
-        bdgm::runtime::Runtime::Python => Command::new(runtime_path.as_deref().unwrap_or("python"))
-            .args(game.runtime_args())
-            .arg(game_dirs.install.join(game.executable()))
-            .args(game.args())
-            .envs(envvars)
-            .current_dir(&game_dirs.install)
-            .status()?,
-        bdgm::runtime::Runtime::HTML => {
-            play_html_game(game, &game_dirs.install, app_dirs, verbose).await?;
-            std::process::ExitStatus::default()
-        }
-        bdgm::runtime::Runtime::Windows => {
-            if cfg!(target_os = "windows") {
-                Command::new(game_dirs.install.join(game.executable()))
-                    .args(game.args())
-                    .envs(envvars)
-                    .current_dir(&game_dirs.install)
-                    .status()?
-            } else {
-                Command::new(runtime_path.as_deref().unwrap_or("wine"))
-                    .args(game.runtime_args())
-                    .arg(game_dirs.install.join(game.executable()))
-                    .args(game.args())
-                    .envs(envvars)
-                    .env("WINEPREFIX", game_dirs.root.join("wineprefix"))
-                    .current_dir(&game_dirs.install)
-                    .status()?
-            }
-        }
-    };
-    if !status.success()
-        && verbose {
-            eprintln!("Your game crashed: {status}");
-            eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
-        }
-
-    Ok(status)
-}
-
-/// Shared handle to a running native game process.
-///
-/// Cloning shares ownership of the same child. The child is spawned with
-/// `kill_on_drop(true)`, so dropping the last handle without an explicit
-/// kill still terminates the game. Killing is done via a brief lock +
-/// `start_kill`, while the exit-waiter polls `try_wait` so the lock is
-/// never held across a long wait.
-#[derive(Clone, Debug)]
-pub struct ProcessHandle {
-    pub child: Arc<AsyncMutex<tokio::process::Child>>,
-}
-
-/// Spawn a native (non-HTML) game without blocking, returning a killable handle.
-///
-/// Returns an error for HTML games — use `server::start_html_server` instead.
-pub fn spawn_game_process(
-    game: &ValidatedGame,
-    args: &Args,
-    app_dirs: &AppDirs,
-) -> anyhow::Result<ProcessHandle> {
-    use bdgm::runtime::Runtime;
-
+) -> anyhow::Result<tokio::process::Command> {
     let envvars = get_envvars(game, args, app_dirs);
     let game_dirs = GameDirs::from(game, app_dirs);
     let runtime_path = args
@@ -181,9 +99,60 @@ pub fn spawn_game_process(
         }
     };
 
-    let child = cmd
-        .envs(envvars)
-        .current_dir(&game_dirs.install)
+    cmd.envs(envvars).current_dir(&game_dirs.install);
+    Ok(cmd)
+}
+
+/// Run a game to completion, awaiting its exit.
+///
+/// CLI path: just await this. HTML games are served via
+/// `server::play_html_game` (start + await); native games use the shared
+/// `build_command` and await the child.
+pub async fn run_game(
+    game: &ValidatedGame,
+    args: &Args,
+    app_dirs: &AppDirs,
+    verbose: bool,
+) -> anyhow::Result<ExitStatus> {
+    let game_dirs = GameDirs::from(game, app_dirs);
+
+    let status = match game.runtime() {
+        Runtime::HTML => {
+            play_html_game(game, &game_dirs.install, app_dirs, verbose).await?;
+            std::process::ExitStatus::default()
+        }
+        _ => build_command(game, args, app_dirs)?.spawn()?.wait().await?,
+    };
+    if !status.success()
+        && verbose {
+            eprintln!("Your game crashed: {status}");
+            eprintln!("Setting a runtime with `--runtime /path/to/runtime` may fix your issue.");
+        }
+
+    Ok(status)
+}
+
+/// Shared handle to a running native game process.
+///
+/// Cloning shares ownership of the same child. The child is spawned with
+/// `kill_on_drop(true)`, so dropping the last handle without an explicit
+/// kill still terminates the game. Killing is done via a brief lock +
+/// `start_kill`, while the exit-waiter polls `try_wait` so the lock is
+/// never held across a long wait.
+#[derive(Clone, Debug)]
+pub struct ProcessHandle {
+    pub child: Arc<AsyncMutex<tokio::process::Child>>,
+}
+
+/// Spawn a native (non-HTML) game without blocking, returning a killable handle.
+///
+/// Returns an error for HTML games — use `server::start_html_server` instead.
+pub fn spawn_game_process(
+    game: &ValidatedGame,
+    args: &Args,
+    app_dirs: &AppDirs,
+) -> anyhow::Result<ProcessHandle> {
+    let child = build_command(game, args, app_dirs)?
         .kill_on_drop(true)
         .spawn()?;
 

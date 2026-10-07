@@ -5,7 +5,7 @@ use platform_dirs::AppDirs;
 
 use crate::{
     cli::args::Args,
-    core::{dirs::try_get_manifest_path, error::AppError, install::install, launch::launch_game},
+    core::{dirs::try_get_manifest_path, error::AppError, install::install, launch::run_game},
 };
 
 pub mod dirs;
@@ -36,7 +36,7 @@ pub async fn run_sanitized(args: Args, verbose: bool) -> anyhow::Result<ExitStat
     install(&game, &app_dirs, &args)?;
 
     println!("Launching...");
-    let status = launch_game(&game, &args, &app_dirs, verbose).await?;
+    let status = run_game(&game, &args, &app_dirs, verbose).await?;
 
     Ok(status)
 }
