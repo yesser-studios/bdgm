@@ -3,3 +3,11 @@ target/
 *.udf
 !DISC_read.BDGM
 .direnv/
+
+# Development certificate
+devcert.pfx
+
+# Winapp CLI stuff
+.winapp/
+AppX/
+dist/
