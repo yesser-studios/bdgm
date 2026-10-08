@@ -6,9 +6,18 @@ use clap::Parser;
 
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
-    args.runtime = match args.runtime.as_ref().map(std::path::absolute) {
-        Some(p) => Some(p?),
-        None => args.runtime,
+    args.runtime = match args.runtime.take() {
+        Some(path)
+            if path.components().count() == 1
+                && matches!(
+                    path.components().next(),
+                    Some(std::path::Component::Normal(_))
+                ) =>
+        {
+            Some(path)
+        }
+        Some(p) => Some(std::path::absolute(p)?),
+        None => None,
     };
 
     let status = match args.location {
