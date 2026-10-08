@@ -4,8 +4,12 @@ use bdgm_play::{
 };
 use clap::Parser;
 
-fn main() {
-    let args = Args::parse();
+fn main() -> anyhow::Result<()> {
+    let mut args = Args::parse();
+    args.runtime = match args.runtime.as_ref().map(std::path::absolute) {
+        Some(p) => Some(p?),
+        None => args.runtime,
+    };
 
     let status = match args.location {
         Some(_) => match tokio::runtime::Builder::new_multi_thread()
@@ -67,4 +71,6 @@ fn main() {
             std::process::exit(1);
         }
     }
+
+    Ok(())
 }
