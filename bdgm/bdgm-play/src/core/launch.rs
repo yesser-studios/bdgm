@@ -153,7 +153,9 @@ pub async fn run_game(
     };
     if !status.success() && verbose {
         eprintln!("Your game crashed: {status}");
-        eprintln!("Specifying a runtime with `--runtime /path/to/runtime` may fix your issue.");
+        if (cfg!(windows) && !matches!(game.runtime(), Runtime::Windows)) || cfg!(not(windows)) {
+            eprintln!("Specifying a runtime with `--runtime /path/to/runtime` may fix your issue.");
+        }
     }
 
     Ok(status)
