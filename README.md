@@ -63,3 +63,8 @@ For example, with xorriso:
 sudo xorriso -as cdrecord -v dev=/dev/sr0 image-bd.bin
 ```
 ***Double-check the device path before burning!***
+
+## License
+
+All code is licensed under the [MIT license](./LICENSE.md).  
+The BDGM logo is licensed under a [separate license](logo-license.md). The copyright holder for the BDGM logo is [APlum](https://github.com/AnimalPlum).
