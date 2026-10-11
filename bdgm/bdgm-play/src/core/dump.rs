@@ -284,6 +284,35 @@ pub(crate) fn open_raw_udf(drive: &str) -> anyhow::Result<UdfVolume<RawSectorRea
     Ok(UdfVolume::open(RawSectorReader::new(File::open(drive)?)?)?)
 }
 
+/// Shared child-directory lookup on an open raw-disc volume: `None` when
+/// `name` is missing or not a directory, `Err` only on I/O. The lenient
+/// probe (`Ok(false)`) and the strict readers (missing → typed `BDGMError`)
+/// build on this one lookup.
+#[cfg(windows)]
+fn find_child_dir<DATA>(
+    udf: &UdfVolume<DATA>,
+    dir: &UdfDir,
+    name: &str,
+) -> anyhow::Result<Option<UdfDir>>
+where
+    DATA: hadris_udf::Read + hadris_udf::Seek,
+{
+    let Some(entry) = dir.find(name) else {
+        return Ok(None);
+    };
+    if !entry.is_dir() {
+        return Ok(None);
+    }
+    Ok(Some(udf.read_directory(&entry.icb)?))
+}
+
+/// Lenient file check inside an already-open directory: missing or
+/// non-file → `false`. No reads beyond the directory listing.
+#[cfg(windows)]
+fn has_dir_file(dir: &UdfDir, name: &str) -> bool {
+    dir.find(name).is_some_and(|entry| entry.is_file())
+}
+
 /// Fs-map-only probe: checks the UDF directory structure for
 /// `/BDGM/DISC.BDGM` without reading any file contents.
 ///
@@ -294,16 +323,10 @@ pub(crate) fn open_raw_udf(drive: &str) -> anyhow::Result<UdfVolume<RawSectorRea
 pub fn raw_disc_has_manifest(drive: &str) -> anyhow::Result<bool> {
     let udf = open_raw_udf(drive)?;
     let root = udf.root_dir()?;
-    let Some(bdgm) = root.find("BDGM") else {
+    let Some(bdgm_dir) = find_child_dir(&udf, &root, "BDGM")? else {
         return Ok(false);
     };
-    if !bdgm.is_dir() {
-        return Ok(false);
-    }
-    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
-    Ok(bdgm_dir
-        .find("DISC.BDGM")
-        .is_some_and(|entry| entry.is_file()))
+    Ok(has_dir_file(&bdgm_dir, "DISC.BDGM"))
 }
 
 /// Reads only `/BDGM/DISC.BDGM` off a raw disc via seek-based partial UDF
@@ -316,13 +339,8 @@ pub fn raw_disc_has_manifest(drive: &str) -> anyhow::Result<bool> {
 pub fn read_manifest_from_raw_disc(drive: &str) -> anyhow::Result<String> {
     let udf = open_raw_udf(drive)?;
     let root = udf.root_dir()?;
-    let bdgm = root
-        .find("BDGM")
+    let bdgm_dir = find_child_dir(&udf, &root, "BDGM")?
         .ok_or(BDGMError::BDGMDirectoryMissing)?;
-    if !bdgm.is_dir() {
-        return Err(BDGMError::BDGMDirectoryMissing.into());
-    }
-    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
     let entry = bdgm_dir
         .find("DISC.BDGM")
         .ok_or(BDGMError::DiscFileMissing)?;
@@ -365,26 +383,28 @@ where
 #[cfg(windows)]
 fn udf_executable_exists<DATA>(
     udf: &UdfVolume<DATA>,
-    mut dir: UdfDir,
+    dir: &UdfDir,
     executable: &Path,
 ) -> anyhow::Result<bool>
 where
     DATA: hadris_udf::Read + hadris_udf::Seek,
 {
+    let mut scratch: Option<UdfDir>;
+    let mut current: &UdfDir = dir;
     let mut components = executable.components().peekable();
     while let Some(component) = components.next() {
         let name = component.as_os_str().to_string_lossy();
-        let Some(entry) = dir.find(&name) else {
+        let Some(entry) = current.find(&name) else {
             return Ok(false);
         };
-        let last = components.peek().is_none();
-        if last {
+        if components.peek().is_none() {
             return Ok(entry.is_file());
         }
         if !entry.is_dir() {
             return Ok(false);
         }
-        dir = udf.read_directory(&entry.icb)?;
+        scratch = Some(udf.read_directory(&entry.icb)?);
+        current = scratch.as_ref().expect("scratch just filled");
     }
     Ok(false)
 }
@@ -402,21 +422,11 @@ pub fn copy_app_from_raw_disc(
 ) -> anyhow::Result<()> {
     let udf = open_raw_udf(drive)?;
     let root = udf.root_dir()?;
-    let bdgm = root
-        .find("BDGM")
+    let bdgm_dir = find_child_dir(&udf, &root, "BDGM")?
         .ok_or(BDGMError::BDGMDirectoryMissing)?;
-    if !bdgm.is_dir() {
-        return Err(BDGMError::BDGMDirectoryMissing.into());
-    }
-    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
-    let app = bdgm_dir
-        .find("APP")
+    let app_dir = find_child_dir(&udf, &bdgm_dir, "APP")?
         .ok_or(BDGMError::AppDirectoryMissing)?;
-    if !app.is_dir() {
-        return Err(BDGMError::AppDirectoryMissing.into());
-    }
-    let app_dir = udf.read_directory(&app.icb)?;
-    if !udf_executable_exists(&udf, udf.read_directory(&app.icb)?, game.executable())? {
+    if !udf_executable_exists(&udf, &app_dir, game.executable())? {
         return Err(BDGMError::ExecutableMissing(
             game.executable().to_string_lossy().into_owned(),
         )
