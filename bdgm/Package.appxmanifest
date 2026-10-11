@@ -15,7 +15,7 @@
   <Identity
     Name="25078YesserStudios.BDGMPlayer"
     Publisher="CN=197534C1-4006-44A2-BFCD-CA87D3F8D948"
-    Version="0.4.1.0" />
+    Version="0.5.0.0" />
 
   <Properties>
     <DisplayName>BDGM Player</DisplayName>
