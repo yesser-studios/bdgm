@@ -1,7 +1,7 @@
 [package]
 name = "bdgm-play"
 description = "A simple CLI and GUI BDGM player"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/yesser-studios/bdgm"
