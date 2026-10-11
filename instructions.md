@@ -44,9 +44,13 @@ Then, in the app, click "Open Disc" and select the mount point.
 On both Windows and Linux, you can use `bdgm-play` as a CLI.
 
 ### Install CLI on Windows
-To install `bdgm-play`, we're going to need Rust and VS Build Tools.
-Download rustup-init.exe for your architecture from: <https://rust-lang.org/learn/get-started/> and run it. It should also install VS Build Tools.
-After everything is installed, run `cargo install bdgm-play` in PowerShell or CMD to build and install `bdgm-play`.
+
+The Microsoft Store package includes the CLI `bdgm-play`. Follow the same steps as the GUI.
+
+You can also install `bdgm-play` via Cargo, if you do not want to install via the Microsoft Store.
+To do that, you need Rust and VS Build Tools.
+1. Download rustup-init.exe for your architecture from: <https://rust-lang.org/learn/get-started/> and run it. It should also install VS Build Tools.
+2. After everything is installed, run `cargo install bdgm-play` in PowerShell or CMD to build and install `bdgm-play`.
 
 ### Install CLI on Linux
 
@@ -67,4 +71,4 @@ bdgm-play --raw-disc \\.\L:
 ```
 ***Replace `L` with your disc drive's letter.***
 
-(see the Windows GUI guide for explanation why)
+(see the Windows GUI guide for explanation why this instead of a mounted directory)
