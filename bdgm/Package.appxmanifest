@@ -5,6 +5,7 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
@@ -45,6 +46,13 @@
         Square44x44Logo="Assets\AppList.png">
         <uap:DefaultTile Wide310x150Logo="Assets\WideTile.png" />
       </uap:VisualElements>
+      <Extensions>
+      <uap5:Extension Category="windows.appExecutionAlias">
+        <uap5:AppExecutionAlias>
+          <uap5:ExecutionAlias Alias="bdgm-play.exe" />
+        </uap5:AppExecutionAlias>
+      </uap5:Extension>
+</Extensions>
     </Application>
   </Applications>
 
