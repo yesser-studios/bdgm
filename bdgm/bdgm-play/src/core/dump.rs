@@ -3,6 +3,8 @@ use std::{
     fs::{self, File},
     path::Path,
 };
+#[cfg(windows)]
+use bdgm::error::BDGMError;
 
 #[cfg(windows)]
 use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
@@ -189,6 +191,144 @@ pub fn dump_disc_with_progress(
 #[cfg(windows)]
 pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
     dump_disc_with_progress(drive, output, |_, _| {})
+}
+
+/// Sector-aligned reader for raw optical drives (`\\.\X:`).
+///
+/// Windows optical drives only serve 2048-byte aligned reads (an unaligned
+/// 16-byte read fails with OS error 1), while `hadris-udf` parses
+/// descriptors with small unaligned reads. This adapter translates any
+/// `Read`/`Seek` into whole-sector reads with a one-sector cache, so UDF
+/// metadata and a single small file can be fetched with only dozens of
+/// sectors touched instead of a full dump.
+#[cfg(windows)]
+struct RawSectorReader {
+    file: File,
+    pos: u64,
+    len: u64,
+    cache_sector: u64,
+    cache: [u8; SECTOR_SIZE],
+    cache_valid: bool,
+}
+
+#[cfg(windows)]
+impl RawSectorReader {
+    fn new(file: File) -> io::Result<Self> {
+        let len = disc_size(&file)?;
+        Ok(Self {
+            file,
+            pos: 0,
+            len,
+            cache_sector: 0,
+            cache: [0u8; SECTOR_SIZE],
+            cache_valid: false,
+        })
+    }
+
+    fn fill_sector(&mut self, sector: u64) -> io::Result<()> {
+        if self.cache_valid && self.cache_sector == sector {
+            return Ok(());
+        }
+        self.file.seek(SeekFrom::Start(sector * SECTOR_SIZE as u64))?;
+        self.file.read_exact(&mut self.cache)?;
+        self.cache_sector = sector;
+        self.cache_valid = true;
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+impl Read for RawSectorReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        let sector = self.pos / SECTOR_SIZE as u64;
+        let offset = (self.pos % SECTOR_SIZE as u64) as usize;
+        self.fill_sector(sector)?;
+        let n = buf.len().min(SECTOR_SIZE - offset);
+        buf[..n].copy_from_slice(&self.cache[offset..offset + n]);
+        self.pos += n as u64;
+        Ok(n)
+    }
+}
+
+#[cfg(windows)]
+impl Seek for RawSectorReader {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        let new = match pos {
+            SeekFrom::Start(o) => o as i64,
+            SeekFrom::Current(o) => self.pos as i64 + o,
+            SeekFrom::End(o) => self.len as i64 + o,
+        };
+        if new < 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "seek before start of disc",
+            ));
+        }
+        self.pos = new as u64;
+        Ok(self.pos)
+    }
+}
+
+/// Opens a raw disc (`\\.\X:`) as a seekable UDF volume.
+///
+/// Uses [`RawSectorReader`] over a plain handle (no `FILE_FLAG_NO_BUFFERING`),
+/// so only the sectors needed for descriptor/directory/file lookups are
+/// touched.
+#[cfg(windows)]
+fn open_raw_udf(drive: &str) -> anyhow::Result<UdfVolume<RawSectorReader>> {
+    Ok(UdfVolume::open(RawSectorReader::new(File::open(drive)?)?)?)
+}
+
+/// Fs-map-only probe: checks the UDF directory structure for
+/// `/BDGM/DISC.BDGM` without reading any file contents.
+///
+/// Returns `Ok(false)` when the `BDGM` dir is missing, is not a directory,
+/// or contains no `DISC.BDGM` file entry. Any I/O/UDF parse error is
+/// returned as `Err` so the caller can fall back to a full dump.
+#[cfg(windows)]
+pub fn raw_disc_has_manifest(drive: &str) -> anyhow::Result<bool> {
+    let udf = open_raw_udf(drive)?;
+    let root = udf.root_dir()?;
+    let Some(bdgm) = root.find("BDGM") else {
+        return Ok(false);
+    };
+    if !bdgm.is_dir() {
+        return Ok(false);
+    }
+    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
+    Ok(bdgm_dir
+        .find("DISC.BDGM")
+        .is_some_and(|entry| entry.is_file()))
+}
+
+/// Reads only `/BDGM/DISC.BDGM` off a raw disc via seek-based partial UDF
+/// reads (descriptors + directory chain + the manifest's own extents).
+///
+/// The fs map is checked first: missing `BDGM` dir or `DISC.BDGM` entry
+/// yields `BDGMError::BDGMDirectoryMissing` / `BDGMError::DiscFileMissing`
+/// without touching any other file data.
+#[cfg(windows)]
+pub fn read_manifest_from_raw_disc(drive: &str) -> anyhow::Result<String> {
+    let udf = open_raw_udf(drive)?;
+    let root = udf.root_dir()?;
+    let bdgm = root
+        .find("BDGM")
+        .ok_or(BDGMError::BDGMDirectoryMissing)?;
+    if !bdgm.is_dir() {
+        return Err(BDGMError::BDGMDirectoryMissing.into());
+    }
+    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
+    let entry = bdgm_dir
+        .find("DISC.BDGM")
+        .ok_or(BDGMError::DiscFileMissing)?;
+    if !entry.is_file() {
+        return Err(BDGMError::DiscFileMissing.into());
+    }
+    let bytes = udf.read_file(entry)?;
+    Ok(String::from_utf8(bytes).map_err(|_| BDGMError::DiscFileInvalid)?)
 }
 
 pub fn extract_udf_dir(
