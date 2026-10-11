@@ -96,8 +96,9 @@ pub(crate) struct AppState {
     pub(crate) initial_runtime: Option<PathBuf>,
     pub(crate) phase: Phase,
     pub(crate) status: String,
-    /// Raw-disc dump progress as `(sectors_done, sectors_total)`.
-    /// `Some` while dumping on Windows; `None` otherwise.
+    /// Raw-disc copy progress as `(bytes_done, bytes_total)`.
+    /// `Some` while dumping from / installing off a raw disc on Windows;
+    /// `None` otherwise.
     pub(crate) dump_progress: Option<(u64, u64)>,
     pub(crate) starting_slot: Option<Slot>,
     pub(crate) playing_info: Option<GameInfo>,

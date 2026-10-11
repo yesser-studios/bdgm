@@ -23,8 +23,9 @@ use super::{
 
 // Synchronous preparation: resolve image -> manifest -> validate ->
 // install. Runs inside `spawn_blocking` so the UI stays responsive while
-// a raw disc is being dumped. Reports `(sectors_done, sectors_total)` via
-// `on_progress` (only the Windows raw-disc path emits progress).
+// a raw disc is being dumped or installed from. Reports byte progress
+// `(bytes_done, bytes_total)` via `on_progress` (only the Windows raw-disc
+// paths emit progress).
 struct Prepared {
     resolved: Args,
     tempdir: Option<TempDir>,
@@ -72,8 +73,8 @@ fn store_session(
     Ok(info)
 }
 
-// Background start as a stream: yields `DumpProgress` while a raw disc is
-// being dumped, then a single terminal `GameStarted`. The blocking
+// Background start as a stream: yields progress while a raw disc is
+// being dumped or installed from, then a single terminal `GameStarted`. The blocking
 // resolve/install phase runs in `spawn_blocking` with progress bridged over
 // a tokio unbounded channel; the async HTML-server spawn runs afterwards.
 pub(crate) fn start_game_stream(

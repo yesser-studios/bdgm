@@ -68,13 +68,19 @@ fn seed_manifest_tempdir(
 
 /// Raw-disc fast path: reads only `DISC.BDGM` with partial UDF seeks. On a
 /// cache hit the dump is skipped; on a miss the game is installed straight
-/// off the disc (`APP` subtree only) instead of dumping + fully extracting.
+/// off the disc (`APP` subtree only) instead of dumping + fully extracting,
+/// reporting file bytes via `on_progress(done, total)`.
+///
 /// Returns `Some` once the game is installed either way; returns `None` when
-/// the disc can't be pre-read (fall back to the full dump below).
+/// the disc can't be pre-read (fall back to the full dump below, which
+/// reports its own byte progress on the same channel).
 /// Install errors propagate — a disc that fails partial reads will fail the
 /// dump's sector reads too.
 #[cfg(windows)]
-fn try_raw_disc_direct(args: &Args) -> Option<anyhow::Result<(Args, Option<TempDir>)>> {
+fn try_raw_disc_direct(
+    args: &Args,
+    on_progress: &mut impl FnMut(u64, u64),
+) -> Option<anyhow::Result<(Args, Option<TempDir>)>> {
     let drive = args.location.as_ref()?.to_string_lossy().into_owned();
     let runtime = args.runtime.clone();
 
@@ -97,9 +103,10 @@ fn try_raw_disc_direct(args: &Args) -> Option<anyhow::Result<(Args, Option<TempD
         return Some(seed_manifest_tempdir(manifest, runtime));
     }
 
-    // 3b. Cache miss: install APP straight off the disc.
+    // 3b. Cache miss: install APP straight off the disc, reporting file
+    // bytes through the shared progress channel.
     println!("Installing game from disc...");
-    if let Err(e) = install_from_raw_disc(&game, &app_dirs, &drive) {
+    if let Err(e) = install_from_raw_disc(&game, &app_dirs, &drive, &mut *on_progress) {
         return Some(Err(e));
     }
     Some(seed_manifest_tempdir(manifest, runtime))
@@ -120,9 +127,10 @@ pub fn resolve_image_args_with_progress(
         #[cfg(windows)]
         ImageState::RawDisc => {
             // Fast path: install straight off the disc (or skip entirely
-            // on cache hit) with partial UDF reads. Unreadable discs fall
-            // through to the full dump below.
-            if let Some(direct) = try_raw_disc_direct(&args) {
+            // on cache hit) with partial UDF reads, reporting byte
+            // progress. Unreadable discs fall through to the full dump
+            // below.
+            if let Some(direct) = try_raw_disc_direct(&args, &mut on_progress) {
                 return direct;
             }
 

@@ -160,11 +160,14 @@ pub fn dump_disc_with_progress(
     });
     let sectors_to_copy = udf_end.min(sectors);
     drive.seek(SeekFrom::Start(0))?;
+    // Progress is reported in bytes (not sectors) so GUI consumers can
+    // share one `(done, total)` channel with file-copy progress.
+    let bytes_total = sectors_to_copy * SECTOR_SIZE as u64;
 
     println!(
         "Dumped partition size: {} bytes ({:.2} MiB)",
-        sectors_to_copy * SECTOR_SIZE as u64,
-        (sectors_to_copy * SECTOR_SIZE as u64) as f64 / 1024.0 / 1024.0
+        bytes_total,
+        bytes_total as f64 / 1024.0 / 1024.0
     );
 
     for sector in 0..sectors_to_copy {
@@ -172,7 +175,7 @@ pub fn dump_disc_with_progress(
         output.write_all(&buffer)?;
 
         if sector % 512 == 0 || sector + 1 == sectors_to_copy {
-            on_progress(sector + 1, sectors_to_copy);
+            on_progress((sector + 1) * SECTOR_SIZE as u64, bytes_total);
         }
 
         if sector % 1024 == 0 {
@@ -355,6 +358,23 @@ pub fn extract_udf_dir<DATA>(udf: &UdfVolume<DATA>, dir: &UdfDir, output_path: &
 where
     DATA: hadris_udf::Read + hadris_udf::Seek,
 {
+    extract_udf_dir_with_progress(udf, dir, output_path, &mut 0, 0, &mut |_, _| {})
+}
+
+/// Recursive UDF extractor reporting cumulative file bytes via
+/// `on_progress(done, total)`. Per-file granularity: `read_file` loads each
+/// file at once, so progress advances once per written file.
+pub fn extract_udf_dir_with_progress<DATA>(
+    udf: &UdfVolume<DATA>,
+    dir: &UdfDir,
+    output_path: &Path,
+    done: &mut u64,
+    total: u64,
+    on_progress: &mut impl FnMut(u64, u64),
+) -> anyhow::Result<()>
+where
+    DATA: hadris_udf::Read + hadris_udf::Seek,
+{
     for entry in dir.entries() {
         if entry.is_parent() {
             continue;
@@ -365,11 +385,13 @@ where
             let child_path = output_path.join(name);
             fs::create_dir_all(&child_path)?;
             let child = udf.read_directory(&entry.icb)?;
-            extract_udf_dir(udf, &child, &child_path)?;
+            extract_udf_dir_with_progress(udf, &child, &child_path, done, total, on_progress)?;
         } else {
             let file_path = output_path.join(name);
             let bytes = udf.read_file(entry)?;
             fs::write(&file_path, bytes)?;
+            *done += entry.size;
+            on_progress(*done, total);
         }
     }
 
@@ -409,16 +431,41 @@ where
     Ok(false)
 }
 
+/// Metadata-only walk summing file content bytes under a UDF directory.
+/// Used to learn the progress total before extracting, without reading any
+/// file data.
+#[cfg(windows)]
+fn udf_subtree_bytes<DATA>(udf: &UdfVolume<DATA>, dir: &UdfDir) -> anyhow::Result<u64>
+where
+    DATA: hadris_udf::Read + hadris_udf::Seek,
+{
+    let mut total = 0u64;
+    for entry in dir.entries() {
+        if entry.is_parent() {
+            continue;
+        }
+        if entry.is_dir() {
+            total += udf_subtree_bytes(udf, &udf.read_directory(&entry.icb)?)?;
+        } else {
+            total += entry.size;
+        }
+    }
+    Ok(total)
+}
+
 /// Copies only `/BDGM/APP` off a raw disc into `dest` (content-only, like
 /// `install`), verifying the game's executable entry first.
 ///
 /// Reads just the UDF metadata chain plus the `APP` subtree extents — no
-/// full-disc dump and no whole-disc extraction.
+/// full-disc dump and no whole-disc extraction. Reports file bytes via
+/// `on_progress(done, total)`, emitting `(0, total)` first so a progress
+/// bar can appear immediately.
 #[cfg(windows)]
 pub fn copy_app_from_raw_disc(
     drive: &str,
     game: &ValidatedGame,
     dest: &Path,
+    mut on_progress: impl FnMut(u64, u64),
 ) -> anyhow::Result<()> {
     let udf = open_raw_udf(drive)?;
     let root = udf.root_dir()?;
@@ -432,6 +479,26 @@ pub fn copy_app_from_raw_disc(
         )
         .into());
     }
-    extract_udf_dir(&udf, &app_dir, dest)?;
+    let total = udf_subtree_bytes(&udf, &app_dir)?;
+    on_progress(0, total);
+    let mut done = 0u64;
+    // Mirror the dump path's periodic stdout logs so the CLI shows copy
+    // progress too (the GUI renders the same numbers as a bar).
+    let mut last_print = 0u64;
+    const PRINT_EVERY: u64 = 8 * 1024 * 1024;
+    let mut report = |d: u64, t: u64| {
+        on_progress(d, t);
+        if d == t || d - last_print >= PRINT_EVERY {
+            last_print = d;
+            let pct = if t > 0 { d as f64 * 100.0 / t as f64 } else { 0.0 };
+            println!(
+                "Copying: {:.1}/{:.1} MiB ({:.1}%)",
+                d as f64 / 1024.0 / 1024.0,
+                t as f64 / 1024.0 / 1024.0,
+                pct
+            );
+        }
+    };
+    extract_udf_dir_with_progress(&udf, &app_dir, dest, &mut done, total, &mut report)?;
     Ok(())
 }

@@ -73,9 +73,10 @@ pub fn install_from_raw_disc(
     game: &ValidatedGame,
     app_dirs: &AppDirs,
     drive: &str,
+    on_progress: impl FnMut(u64, u64),
 ) -> anyhow::Result<()> {
     with_install_slot(game, app_dirs, |part_dir| {
         println!("Copying files from disc...");
-        crate::core::dump::copy_app_from_raw_disc(drive, game, part_dir)
+        crate::core::dump::copy_app_from_raw_disc(drive, game, part_dir, on_progress)
     })
 }
