@@ -25,6 +25,8 @@ use crate::core::dump::{
     dump_disc_with_progress, raw_disc_has_manifest, read_manifest_from_raw_disc,
 };
 #[cfg(windows)]
+use crate::core::install::install_from_raw_disc;
+#[cfg(windows)]
 use tempfile::NamedTempFile;
 
 enum ImageState {
@@ -48,12 +50,31 @@ impl ImageState {
     }
 }
 
-/// Raw-disc fast path: returns `Some` when the disc's `DISC.BDGM` can be
-/// read with partial UDF seeks and its `id`+`version` is already installed,
-/// letting the caller skip the full dump. Returns `None` on any preflight
-/// failure or cache miss so the caller falls through to the full dump.
+/// Seeds a tempdir with just `BDGM/DISC.BDGM` so the downstream
+/// `read_manifest` + `install` (no-op) flow works unchanged.
 #[cfg(windows)]
-fn try_raw_disc_cache_hit(args: &Args) -> Option<anyhow::Result<(Args, Option<TempDir>)>> {
+fn seed_manifest_tempdir(
+    manifest: String,
+    runtime: Option<std::path::PathBuf>,
+) -> anyhow::Result<(Args, Option<TempDir>)> {
+    let extract_dir = tempdir()?;
+    std::fs::create_dir_all(extract_dir.path().join("BDGM"))?;
+    std::fs::write(extract_dir.path().join("BDGM").join("DISC.BDGM"), manifest)?;
+    Ok((
+        Args::new_imageless(Some(extract_dir.path().to_path_buf()), runtime),
+        Some(extract_dir),
+    ))
+}
+
+/// Raw-disc fast path: reads only `DISC.BDGM` with partial UDF seeks. On a
+/// cache hit the dump is skipped; on a miss the game is installed straight
+/// off the disc (`APP` subtree only) instead of dumping + fully extracting.
+/// Returns `Some` once the game is installed either way; returns `None` when
+/// the disc can't be pre-read (fall back to the full dump below).
+/// Install errors propagate — a disc that fails partial reads will fail the
+/// dump's sector reads too.
+#[cfg(windows)]
+fn try_raw_disc_direct(args: &Args) -> Option<anyhow::Result<(Args, Option<TempDir>)>> {
     let drive = args.location.as_ref()?.to_string_lossy().into_owned();
     let runtime = args.runtime.clone();
 
@@ -65,24 +86,23 @@ fn try_raw_disc_cache_hit(args: &Args) -> Option<anyhow::Result<(Args, Option<Te
     let manifest = read_manifest_from_raw_disc(&drive).ok()?;
     let game = ValidatedGame::validate(Game::from_str(&manifest).ok()?).ok()?;
     let app_dirs = AppDirs::new(Some("bdgm-play"), true)?;
-    if !GameDirs::from(&game, &app_dirs)
+
+    // 3a. Cache hit: skip everything.
+    if GameDirs::from(&game, &app_dirs)
         .install
         .try_exists()
         .ok()?
     {
-        return None;
+        println!("Game already installed, skipping disc dump.");
+        return Some(seed_manifest_tempdir(manifest, runtime));
     }
 
-    // 3. Seed a tempdir with just BDGM/DISC.BDGM so the downstream
-    // `read_manifest` + `install` (no-op) flow works unchanged.
-    let extract_dir = tempdir().ok()?;
-    std::fs::create_dir_all(extract_dir.path().join("BDGM")).ok()?;
-    std::fs::write(extract_dir.path().join("BDGM").join("DISC.BDGM"), manifest).ok()?;
-    println!("Game already installed, skipping disc dump.");
-    Some(Ok((
-        Args::new_imageless(Some(extract_dir.path().to_path_buf()), runtime),
-        Some(extract_dir),
-    )))
+    // 3b. Cache miss: install APP straight off the disc.
+    println!("Installing game from disc...");
+    if let Err(e) = install_from_raw_disc(&game, &app_dirs, &drive) {
+        return Some(Err(e));
+    }
+    Some(seed_manifest_tempdir(manifest, runtime))
 }
 
 #[allow(unused_mut)]
@@ -99,12 +119,11 @@ pub fn resolve_image_args_with_progress(
         ImageState::Image => File::open(&args.location.ok_or(IoError::PathNone)?)?,
         #[cfg(windows)]
         ImageState::RawDisc => {
-            // Fast path: read only DISC.BDGM off the disc (partial UDF
-            // seeks) and skip the full dump when this id+version is
-            // already installed. Any preflight failure falls through to
-            // the full dump below.
-            if let Some(cached) = try_raw_disc_cache_hit(&args) {
-                return cached;
+            // Fast path: install straight off the disc (or skip entirely
+            // on cache hit) with partial UDF reads. Unreadable discs fall
+            // through to the full dump below.
+            if let Some(direct) = try_raw_disc_direct(&args) {
+                return direct;
             }
 
             let dump_file = NamedTempFile::new()?;

@@ -5,6 +5,8 @@ use std::{
 };
 #[cfg(windows)]
 use bdgm::error::BDGMError;
+#[cfg(windows)]
+use bdgm::game::ValidatedGame;
 
 #[cfg(windows)]
 use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
@@ -202,7 +204,7 @@ pub fn dump_disc(drive: &str, output: &str) -> io::Result<()> {
 /// metadata and a single small file can be fetched with only dozens of
 /// sectors touched instead of a full dump.
 #[cfg(windows)]
-struct RawSectorReader {
+pub(crate) struct RawSectorReader {
     file: File,
     pos: u64,
     len: u64,
@@ -278,7 +280,7 @@ impl Seek for RawSectorReader {
 /// so only the sectors needed for descriptor/directory/file lookups are
 /// touched.
 #[cfg(windows)]
-fn open_raw_udf(drive: &str) -> anyhow::Result<UdfVolume<RawSectorReader>> {
+pub(crate) fn open_raw_udf(drive: &str) -> anyhow::Result<UdfVolume<RawSectorReader>> {
     Ok(UdfVolume::open(RawSectorReader::new(File::open(drive)?)?)?)
 }
 
@@ -331,11 +333,10 @@ pub fn read_manifest_from_raw_disc(drive: &str) -> anyhow::Result<String> {
     Ok(String::from_utf8(bytes).map_err(|_| BDGMError::DiscFileInvalid)?)
 }
 
-pub fn extract_udf_dir(
-    udf: &UdfVolume<File>,
-    dir: &UdfDir,
-    output_path: &Path,
-) -> anyhow::Result<()> {
+pub fn extract_udf_dir<DATA>(udf: &UdfVolume<DATA>, dir: &UdfDir, output_path: &Path) -> anyhow::Result<()>
+where
+    DATA: hadris_udf::Read + hadris_udf::Seek,
+{
     for entry in dir.entries() {
         if entry.is_parent() {
             continue;
@@ -354,5 +355,73 @@ pub fn extract_udf_dir(
         }
     }
 
+    Ok(())
+}
+
+/// Walks a manifest-relative executable path (e.g. `app.dll` or
+/// `bin/app.dll`) down from a UDF directory. Returns `Ok(true)` when the
+/// full path resolves to a file, `Ok(false)` when any component is missing
+/// or the target is not a file.
+#[cfg(windows)]
+fn udf_executable_exists<DATA>(
+    udf: &UdfVolume<DATA>,
+    mut dir: UdfDir,
+    executable: &Path,
+) -> anyhow::Result<bool>
+where
+    DATA: hadris_udf::Read + hadris_udf::Seek,
+{
+    let mut components = executable.components().peekable();
+    while let Some(component) = components.next() {
+        let name = component.as_os_str().to_string_lossy();
+        let Some(entry) = dir.find(&name) else {
+            return Ok(false);
+        };
+        let last = components.peek().is_none();
+        if last {
+            return Ok(entry.is_file());
+        }
+        if !entry.is_dir() {
+            return Ok(false);
+        }
+        dir = udf.read_directory(&entry.icb)?;
+    }
+    Ok(false)
+}
+
+/// Copies only `/BDGM/APP` off a raw disc into `dest` (content-only, like
+/// `install`), verifying the game's executable entry first.
+///
+/// Reads just the UDF metadata chain plus the `APP` subtree extents — no
+/// full-disc dump and no whole-disc extraction.
+#[cfg(windows)]
+pub fn copy_app_from_raw_disc(
+    drive: &str,
+    game: &ValidatedGame,
+    dest: &Path,
+) -> anyhow::Result<()> {
+    let udf = open_raw_udf(drive)?;
+    let root = udf.root_dir()?;
+    let bdgm = root
+        .find("BDGM")
+        .ok_or(BDGMError::BDGMDirectoryMissing)?;
+    if !bdgm.is_dir() {
+        return Err(BDGMError::BDGMDirectoryMissing.into());
+    }
+    let bdgm_dir = udf.read_directory(&bdgm.icb)?;
+    let app = bdgm_dir
+        .find("APP")
+        .ok_or(BDGMError::AppDirectoryMissing)?;
+    if !app.is_dir() {
+        return Err(BDGMError::AppDirectoryMissing.into());
+    }
+    let app_dir = udf.read_directory(&app.icb)?;
+    if !udf_executable_exists(&udf, udf.read_directory(&app.icb)?, game.executable())? {
+        return Err(BDGMError::ExecutableMissing(
+            game.executable().to_string_lossy().into_owned(),
+        )
+        .into());
+    }
+    extract_udf_dir(&udf, &app_dir, dest)?;
     Ok(())
 }
