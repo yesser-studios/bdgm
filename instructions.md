@@ -22,7 +22,7 @@ When starting a game, an error may be shown that the runtime is not installed. Y
 
 Download BDGM Player from the Microsoft Store: <https://apps.microsoft.com/detail/9PD4TRWXK7KX>
 
-After inserting a BDGM disc, an error may be shown that the disc could not be read, or nothing may happen at all. **This is fine**, because Windows decided to only support a small set of UDF formats.
+After inserting a BDGM disc, an error may be shown that the disc could not be read, or nothing may happen at all. ***This is fine***, because Windows decided to only support a small set of UDF formats.
 Luckily, `bdgm-play` can read BDGM discs directly without needing Windows to parse the file system.
 
 In the app, click "Open Disc" and select you drive letter.
