@@ -85,3 +85,52 @@ fn equals_in_value_allowed() {
 
     assert_eq!("Game=1=2", validate_manifest(manifest).unwrap().name());
 }
+
+#[test]
+fn test_with_empty_line_valid() {
+    let manifest = ManifestBuilder::valid().with_raw("").build();
+    dbg!(&manifest);
+
+    validate_manifest(manifest).expect("Manifest with empty line could not be validated.");
+}
+
+#[test]
+fn test_line_without_equals_valid() {
+    let manifest = ManifestBuilder::valid().with_raw("Should succeed.").build();
+    dbg!(&manifest);
+
+    validate_manifest(manifest).expect("Manifest with line without equals could not be validated.");
+}
+
+#[test]
+fn test_line_starting_hash_valid() {
+    let manifest = ManifestBuilder::valid()
+        .with_raw("# Should succeed.")
+        .build();
+    dbg!(&manifest);
+
+    validate_manifest(manifest).expect("Manifest with comment could not be validated.");
+}
+
+#[test]
+fn test_unknown_key_valid() {
+    let manifest = ManifestBuilder::valid()
+        .with("unknown", "should_succeed")
+        .build();
+    dbg!(&manifest);
+
+    validate_manifest(manifest).expect("Manifest with unknown key could not be validated.");
+}
+
+#[test]
+fn test_missing_key_enforced() {
+    let manifest = ManifestBuilder::valid().without("name").build();
+    dbg!(&manifest);
+
+    assert!(
+        validate_manifest(manifest)
+            .unwrap_err()
+            .0
+            .contains(&BDGMError::MandatoryFieldMissing("name".to_string()))
+    )
+}
