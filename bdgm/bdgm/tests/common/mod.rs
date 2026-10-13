@@ -38,7 +38,7 @@ impl ManifestBuilder {
 
     pub fn with(&mut self, key: &str, value: &str) -> &mut Self {
         self.without(key);
-        self.0.push(format!("{key} = {value}"));
+        self.0.push(format!("{key}={value}"));
         self
     }
 
@@ -68,7 +68,7 @@ impl ManifestBuilder {
 }
 
 pub fn validate_manifest(manifest: String) -> Result<ValidatedGame, BDGMErrors> {
-    let game = Game::from_str(&manifest).map_err(BDGMErrors::from)?;
+    let game = Game::from_str(&manifest)?;
     ValidatedGame::validate(game)
 }
 
