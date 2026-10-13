@@ -77,3 +77,11 @@ fn duplicate_keys_forbidden() {
             .contains(&ParserError::DuplicateKey("name".to_string()).into())
     )
 }
+
+#[test]
+fn equals_in_value_allowed() {
+    let manifest = ManifestBuilder::valid().with("name", "Game=1=2").build();
+    dbg!(&manifest);
+
+    assert_eq!("Game=1=2", validate_manifest(manifest).unwrap().name());
+}

@@ -74,12 +74,10 @@ impl FromStr for Game {
                 continue;
             }
 
-            let split = line.split("=").collect::<Vec<&str>>();
-            if split.len() != 2 {
-                continue;
-            }
-            let key = split[0];
-            let value = split[1];
+            let (key, value) = match line.split_once("=") {
+                Some(s) => s,
+                None => continue,
+            };
 
             if key.chars().any(|c| c.is_whitespace()) {
                 errors.add(ParserError::WhitespaceInKey(key.to_string()).into());
