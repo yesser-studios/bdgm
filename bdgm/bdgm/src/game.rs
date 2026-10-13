@@ -1,17 +1,16 @@
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    fmt::Write,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
-
 use crate::{
     error::{
         BDGMError::{self, ArgsInvalid, RuntimeArgsInvalid},
         BDGMErrors, ExecutableError, IdFormatError, ParserError,
     },
     runtime::Runtime,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashSet,
+    fmt::Write,
+    path::{Path, PathBuf},
+    str::FromStr,
 };
 
 /// Raw game struct. Used for parsing DISC.BDGM files using `from_str`.
@@ -327,6 +326,11 @@ impl ValidatedGame {
             serde_json::ser::to_string(&self.runtime_args)?
         )?;
         Ok(result)
+    }
+
+    pub fn validate_manifest(manifest: String) -> Result<Self, BDGMErrors> {
+        let game = Game::from_str(&manifest)?;
+        Self::validate(game)
     }
 
     pub fn bdgm_version(&self) -> &str {

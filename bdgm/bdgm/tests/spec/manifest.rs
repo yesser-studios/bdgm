@@ -1,12 +1,15 @@
-use crate::common::{ManifestBuilder, validate_manifest};
-use bdgm::error::{BDGMError, BDGMErrors, ParserError};
+use crate::common::ManifestBuilder;
+use bdgm::{
+    error::{BDGMError, BDGMErrors, ParserError},
+    game::ValidatedGame,
+};
 
 #[test]
 fn header_enforced() {
     let manifest = ManifestBuilder::valid().build_raw();
 
     assert_eq!(
-        validate_manifest(manifest).unwrap_err(),
+        ValidatedGame::validate_manifest(manifest).unwrap_err(),
         BDGMErrors(vec![BDGMError::UnableToParse(ParserError::InvalidHeader)])
     );
 }
@@ -20,7 +23,7 @@ fn spaces_before_equals_forbidden() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&ParserError::WhitespaceInKey("test ".to_string()).into())
@@ -36,7 +39,7 @@ fn leading_trailing_whitespaces_forbidden() {
 
     dbg!(&manifest);
 
-    let errors = validate_manifest(manifest).unwrap_err();
+    let errors = ValidatedGame::validate_manifest(manifest).unwrap_err();
     assert!(
         errors
             .0
@@ -55,7 +58,7 @@ fn empty_value_forbidden() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&ParserError::EmptyValue("test".to_string()).into())
@@ -68,7 +71,7 @@ fn duplicate_keys_forbidden() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&ParserError::DuplicateKey("name".to_string()).into())
@@ -80,7 +83,10 @@ fn equals_in_value_allowed() {
     let manifest = ManifestBuilder::valid().with("name", "Game=1=2").build();
     dbg!(&manifest);
 
-    assert_eq!("Game=1=2", validate_manifest(manifest).unwrap().name());
+    assert_eq!(
+        "Game=1=2",
+        ValidatedGame::validate_manifest(manifest).unwrap().name()
+    );
 }
 
 #[test]
@@ -88,7 +94,8 @@ fn test_with_empty_line_valid() {
     let manifest = ManifestBuilder::valid().with_raw("").build();
     dbg!(&manifest);
 
-    validate_manifest(manifest).expect("Manifest with empty line could not be validated.");
+    ValidatedGame::validate_manifest(manifest)
+        .expect("Manifest with empty line could not be validated.");
 }
 
 #[test]
@@ -96,7 +103,8 @@ fn test_line_without_equals_valid() {
     let manifest = ManifestBuilder::valid().with_raw("Should succeed.").build();
     dbg!(&manifest);
 
-    validate_manifest(manifest).expect("Manifest with line without equals could not be validated.");
+    ValidatedGame::validate_manifest(manifest)
+        .expect("Manifest with line without equals could not be validated.");
 }
 
 #[test]
@@ -106,7 +114,8 @@ fn test_line_starting_hash_valid() {
         .build();
     dbg!(&manifest);
 
-    validate_manifest(manifest).expect("Manifest with comment could not be validated.");
+    ValidatedGame::validate_manifest(manifest)
+        .expect("Manifest with comment could not be validated.");
 }
 
 #[test]
@@ -116,7 +125,8 @@ fn test_unknown_key_valid() {
         .build();
     dbg!(&manifest);
 
-    validate_manifest(manifest).expect("Manifest with unknown key could not be validated.");
+    ValidatedGame::validate_manifest(manifest)
+        .expect("Manifest with unknown key could not be validated.");
 }
 
 #[test]
@@ -125,7 +135,7 @@ fn test_missing_key_enforced() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&BDGMError::MandatoryFieldMissing("name".to_string()))

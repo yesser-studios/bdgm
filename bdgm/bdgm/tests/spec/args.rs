@@ -1,5 +1,5 @@
-use crate::common::{ManifestBuilder, validate_manifest};
-use bdgm::error::BDGMError;
+use crate::common::ManifestBuilder;
+use bdgm::{error::BDGMError, game::ValidatedGame};
 
 #[test]
 fn args_not_required() {
@@ -9,7 +9,7 @@ fn args_not_required() {
         .build();
     dbg!(&manifest);
 
-    assert!(validate_manifest(manifest).is_ok())
+    assert!(ValidatedGame::validate_manifest(manifest).is_ok())
 }
 
 #[test]
@@ -20,7 +20,7 @@ fn args_json_array_allowed() {
         .build();
     dbg!(&manifest);
 
-    let result = validate_manifest(manifest);
+    let result = ValidatedGame::validate_manifest(manifest);
     dbg!(&result);
     assert!(result.is_ok())
 }
@@ -33,7 +33,7 @@ fn args_json_enforced() {
         .build();
     dbg!(&manifest);
 
-    let errs = validate_manifest(manifest).unwrap_err().0;
+    let errs = ValidatedGame::validate_manifest(manifest).unwrap_err().0;
     assert!(errs.iter().any(|x| matches!(x, BDGMError::ArgsInvalid(_))));
     assert!(
         errs.iter()
@@ -52,7 +52,7 @@ fn args_array_enforced() {
         .build();
     dbg!(&manifest);
 
-    let errs = validate_manifest(manifest).unwrap_err().0;
+    let errs = ValidatedGame::validate_manifest(manifest).unwrap_err().0;
     assert!(errs.iter().any(|x| matches!(x, BDGMError::ArgsInvalid(_))));
     assert!(
         errs.iter()
