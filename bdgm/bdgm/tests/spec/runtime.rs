@@ -1,5 +1,5 @@
-use crate::common::{ManifestBuilder, validate_manifest};
-use bdgm::error::BDGMError;
+use crate::common::ManifestBuilder;
+use bdgm::{error::BDGMError, game::ValidatedGame};
 
 #[test]
 fn runtime_not_in_options_enforced() {
@@ -9,7 +9,7 @@ fn runtime_not_in_options_enforced() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&BDGMError::RuntimeInvalid("bogus-should-fail".to_string()))
@@ -25,7 +25,7 @@ fn runtime_version_missing_enforced() {
     dbg!(&manifest);
 
     assert!(
-        validate_manifest(manifest)
+        ValidatedGame::validate_manifest(manifest)
             .unwrap_err()
             .0
             .contains(&BDGMError::MandatoryFieldMissing(
@@ -42,7 +42,7 @@ fn runtime_version_html_not_required() {
         .build();
     dbg!(&manifest);
 
-    assert!(validate_manifest(manifest).is_ok())
+    assert!(ValidatedGame::validate_manifest(manifest).is_ok())
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn runtime_version_html_windows_non_mandatory() {
         .build();
     dbg!(&manifest);
 
-    assert!(validate_manifest(manifest).is_ok());
+    assert!(ValidatedGame::validate_manifest(manifest).is_ok());
 
     let manifest = ManifestBuilder::valid()
         .with("runtime", "windows")
@@ -61,5 +61,5 @@ fn runtime_version_html_windows_non_mandatory() {
         .build();
     dbg!(&manifest);
 
-    assert!(validate_manifest(manifest).is_ok());
+    assert!(ValidatedGame::validate_manifest(manifest).is_ok());
 }
