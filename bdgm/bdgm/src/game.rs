@@ -77,6 +77,11 @@ impl FromStr for Game {
             }
             let key = split[0];
             let value = split[1];
+
+            if key.split_whitespace().count() != 1 {
+                return Err(ParserError::WhitespaceInKey(key.to_string()).into());
+            }
+
             match key {
                 "name" => result.name = Some(value.to_string()),
                 "id" => result.id = Some(value.to_string()),

@@ -120,6 +120,7 @@ impl Display for BDGMErrors {
 /// Represents a single parser error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParserError {
+    WhitespaceInKey(String),
     InvalidHeader,
     InvalidRuntime,
 }
@@ -127,6 +128,7 @@ pub enum ParserError {
 impl Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ParserError::WhitespaceInKey(key) => write!(f, "There is whitespace in key: {key}"),
             ParserError::InvalidHeader => write!(f, "Invalid header!"),
             ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
         }
