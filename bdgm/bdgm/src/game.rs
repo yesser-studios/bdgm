@@ -1,4 +1,3 @@
-use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Write,
@@ -7,10 +6,7 @@ use std::{
 };
 
 use crate::{
-    error::{
-        BDGMError::{self},
-        BDGMErrors, ExecutableError, IdFormatError, ParserError,
-    },
+    error::{BDGMError, BDGMErrors, ExecutableError, IdFormatError, ParserError},
     runtime::Runtime,
 };
 
@@ -47,7 +43,7 @@ impl Game {
 }
 
 impl FromStr for Game {
-    type Err = anyhow::Error;
+    type Err = BDGMError;
 
     /// Parses a `Game` from `DISC.BDGM` file contents.
     fn from_str(s: &str) -> Result<Game, Self::Err> {
@@ -58,7 +54,7 @@ impl FromStr for Game {
             Some(header) => {
                 let split: Vec<_> = header.split('/').collect();
                 if split.len() != 2 || split.first().is_none_or(|x| *x != "BDGM") {
-                    return Err(Error::from(ParserError::InvalidHeader));
+                    return Err(BDGMError::UnableToParse(ParserError::InvalidHeader));
                 }
                 split.get(1).map(|x| x.to_string())
             }
@@ -86,10 +82,18 @@ impl FromStr for Game {
                 "id" => result.id = Some(value.to_string()),
                 "version" => result.version = Some(value.to_string()),
                 "executable" => result.executable = Some(value.to_string()),
-                "args" => result.args = serde_json::from_str(value)?,
+                "args" => {
+                    result.args = serde_json::from_str(value)
+                        .map_err(|e: serde_json::Error| BDGMError::ArgsInvalid(e.to_string()))?
+                }
                 "runtime" => result.runtime = Some(value.to_string()),
                 "runtime_version" => result.runtime_version = Some(value.to_string()),
-                "runtime_args" => result.runtime_args = serde_json::from_str(value)?,
+                "runtime_args" => {
+                    result.runtime_args =
+                        serde_json::from_str(value).map_err(|e: serde_json::Error| {
+                            BDGMError::RuntimeArgsInvalid(e.to_string())
+                        })?
+                }
                 _ => {}
             }
         }
@@ -230,13 +234,13 @@ impl ValidatedGame {
 
         if let Some(runtime) = &runtime
             && *runtime != Runtime::Windows
-                && *runtime != Runtime::HTML
-                && runtime_version.is_none()
-            {
-                errors.add(BDGMError::MandatoryFieldMissing(
-                    "runtime_version".to_string(),
-                ));
-            }
+            && *runtime != Runtime::HTML
+            && runtime_version.is_none()
+        {
+            errors.add(BDGMError::MandatoryFieldMissing(
+                "runtime_version".to_string(),
+            ));
+        }
 
         let executable: Option<PathBuf> = if !executable.is_empty() {
             if executable.contains('\\') {

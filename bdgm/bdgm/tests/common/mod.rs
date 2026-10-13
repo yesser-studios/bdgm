@@ -67,7 +67,7 @@ impl ManifestBuilder {
 }
 
 pub fn validate_manifest(manifest: String) -> Result<ValidatedGame, BDGMErrors> {
-    let game = Game::from_str(&manifest).expect("Manifest could not be parsed");
+    let game = Game::from_str(&manifest).map_err(BDGMErrors::from)?;
     ValidatedGame::validate(game)
 }
 

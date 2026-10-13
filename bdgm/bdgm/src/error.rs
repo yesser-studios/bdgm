@@ -3,22 +3,6 @@ use thiserror::Error;
 
 use crate::runtime::Runtime;
 
-/// Represents a single parser error.
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum ParserError {
-    InvalidHeader,
-    InvalidRuntime,
-}
-
-impl Display for ParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParserError::InvalidHeader => write!(f, "Invalid header!"),
-            ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
-        }
-    }
-}
-
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum EntryError {
     EntryIsFile,
@@ -37,6 +21,7 @@ impl Display for EntryError {
 /// Represents a single BDGM validation error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum BDGMError {
+    UnableToParse(ParserError),
     MissingHeaderVersion,
     UnsupportedHeaderVersion(String),
     BDGMDirectoryMissing,
@@ -48,13 +33,14 @@ pub enum BDGMError {
     ExecutablePathForbidden(ExecutableError),
     AppDirectoryMissing,
     ExecutableMissing(String),
-    ArgsInvalid,
-    RuntimeArgsInvalid,
+    ArgsInvalid(String),
+    RuntimeArgsInvalid(String),
 }
 
 impl Display for BDGMError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BDGMError::UnableToParse(e) => write!(f, "Unable to parse manifest: {e}"),
             BDGMError::MissingHeaderVersion => write!(f, "The BDGM header is missing!"),
             BDGMError::UnsupportedHeaderVersion(version) => {
                 write!(f, "BDGM spec version {version} is not supported")
@@ -80,13 +66,16 @@ impl Display for BDGMError {
             BDGMError::ExecutablePathForbidden(reason) => {
                 write!(f, "The path to the executable is forbidden: {reason}")
             }
-            BDGMError::ArgsInvalid => {
-                write!(f, "The value of the args field could not be parsed.")
-            }
-            BDGMError::RuntimeArgsInvalid => {
+            BDGMError::ArgsInvalid(reason) => {
                 write!(
                     f,
-                    "The value of the runtime_args field could not be parsed."
+                    "The value of the args field could not be parsed: {reason}"
+                )
+            }
+            BDGMError::RuntimeArgsInvalid(reason) => {
+                write!(
+                    f,
+                    "The value of the runtime_args field could not be parsed: {reason}"
                 )
             }
         }
@@ -102,10 +91,19 @@ impl BDGMErrors {
     pub fn add(&mut self, error: BDGMError) {
         self.0.push(error);
     }
-
     /// Returns `Ok` if the set contains no errors, otherwise returns `Err(self)`.
     pub fn evaluate(self) -> Result<(), Self> {
-        if !self.0.is_empty() { Err(self) } else { Ok(()) }
+        if !self.0.is_empty() {
+            Err(self)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl From<BDGMError> for BDGMErrors {
+    fn from(error: BDGMError) -> Self {
+        Self(vec![error])
     }
 }
 
@@ -116,6 +114,28 @@ impl Display for BDGMErrors {
             write!(f, "\n{err}")?;
         }
         Ok(())
+    }
+}
+
+/// Represents a single parser error.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ParserError {
+    InvalidHeader,
+    InvalidRuntime,
+}
+
+impl Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserError::InvalidHeader => write!(f, "Invalid header!"),
+            ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
+        }
+    }
+}
+
+impl From<ParserError> for BDGMError {
+    fn from(value: ParserError) -> Self {
+        BDGMError::UnableToParse(value)
     }
 }
 
@@ -161,6 +181,12 @@ impl Display for IdFormatError {
     }
 }
 
+impl From<IdFormatError> for BDGMError {
+    fn from(value: IdFormatError) -> Self {
+        BDGMError::IdFormatInvalid(value)
+    }
+}
+
 /// Represents a single executable validation error.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ExecutableError {
@@ -172,4 +198,10 @@ pub enum ExecutableError {
     ContainsParentDir,
     #[error("The path contains a backslash. Use slashes to separate path components.")]
     BackslashSeparated,
+}
+
+impl From<ExecutableError> for BDGMError {
+    fn from(value: ExecutableError) -> Self {
+        BDGMError::ExecutablePathForbidden(value)
+    }
 }
