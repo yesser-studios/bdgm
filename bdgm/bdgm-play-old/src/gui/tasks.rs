@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use bdgm::game::{Game, ValidatedGame};
+use bdgm::game::ValidatedGame;
 use platform_dirs::AppDirs;
 use tempfile::TempDir;
 
@@ -38,8 +36,7 @@ fn prepare_blocking(
 ) -> anyhow::Result<Prepared> {
     let (resolved, tempdir) = resolve_image_args_with_progress(args, on_progress)?;
     let manifest = read_manifest(&resolved)?;
-    let game = Game::from_str(&manifest)?;
-    let game = ValidatedGame::validate(game)?;
+    let game = ValidatedGame::validate_manifest(&manifest)?;
 
     let app_dirs =
         AppDirs::new(Some("bdgm-play"), true).ok_or_else(|| anyhow::anyhow!("NoAppDirs"))?;
