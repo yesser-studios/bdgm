@@ -9,14 +9,14 @@ impl ManifestBuilder {
 
     pub fn valid() -> Self {
         let fields = vec![
-            "name = Example Game".to_string(),
-            "id = com.example.example-game1".to_string(),
-            "version = 1.0.0".to_string(),
-            "runtime = dotnet".to_string(),
-            "runtime_version = 10".to_string(),
-            "executable = bin/ExampleGame.dll".to_string(),
-            "args = []".to_string(),
-            "runtime_args = []".to_string(),
+            "name=Example Game".to_string(),
+            "id=com.example.example-game1".to_string(),
+            "version=1.0.0".to_string(),
+            "runtime=dotnet".to_string(),
+            "runtime_version=10".to_string(),
+            "executable=bin/ExampleGame.dll".to_string(),
+            "args=[]".to_string(),
+            "runtime_args=[]".to_string(),
         ];
         ManifestBuilder(fields)
     }
@@ -35,7 +35,7 @@ impl ManifestBuilder {
     }
 
     pub fn without(&mut self, key: &str) -> &mut Self {
-        self.0.retain(|l| l.starts_with(key));
+        self.0.retain(|l| !l.starts_with(key));
         self
     }
 
@@ -56,5 +56,36 @@ impl ManifestBuilder {
         let mut builder = Self::valid();
         builder.without("runtime_version").with("runtime", "html");
         builder
+    }
+}
+
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+    use bdgm::game::{Game, ValidatedGame};
+
+    #[test]
+    fn valid_manifest_builder_is_valid() {
+        let manifest = ManifestBuilder::valid().build();
+        dbg!(&manifest);
+        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
+        ValidatedGame::validate(game).expect("Game could not be validated.");
+    }
+    #[ignore = "Known bug: Windows runtime version is handled as mandatory."]
+    #[test]
+    fn valid_windows_manifest_builder_is_valid() {
+        let manifest = ManifestBuilder::valid_windows_without_runtime_version().build();
+        dbg!(&manifest);
+        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
+        ValidatedGame::validate(game).expect("Game could not be validated.");
+    }
+    #[ignore = "Known bug: HTML runtime version is not ignored."]
+    #[test]
+    fn valid_html_manifest_builder_is_valid() {
+        let manifest = ManifestBuilder::valid_html_without_runtime_version().build();
+        dbg!(&manifest);
+        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
+        ValidatedGame::validate(game).expect("Game could not be validated.");
     }
 }
