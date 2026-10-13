@@ -30,7 +30,6 @@ fn spaces_before_equals_forbidden() {
     )
 }
 
-#[ignore = "Bug: Leading and trailing whitespaces are not checked"]
 #[test]
 fn leading_trailing_whitespaces_forbidden() {
     let manifest = ManifestBuilder::valid()
