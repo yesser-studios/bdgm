@@ -64,3 +64,16 @@ fn empty_value_forbidden() {
             .contains(&ParserError::EmptyValue("test".to_string()).into())
     )
 }
+
+#[test]
+fn duplicate_keys_forbidden() {
+    let manifest = ManifestBuilder::valid().with_raw("name=Game").build();
+    dbg!(&manifest);
+
+    assert!(
+        validate_manifest(manifest)
+            .unwrap_err()
+            .0
+            .contains(&ParserError::DuplicateKey("name".to_string()).into())
+    )
+}

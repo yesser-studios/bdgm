@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fmt::Write,
     path::{Path, PathBuf},
     str::FromStr,
@@ -62,6 +63,7 @@ impl FromStr for Game {
             None => None,
         };
 
+        let mut used = HashSet::new();
         for line in lines {
             if let Some(char) = line.chars().nth(0)
                 && char == '#'
@@ -86,6 +88,12 @@ impl FromStr for Game {
             if value.is_empty() {
                 errors.add(ParserError::EmptyValue(key.to_string()).into());
             }
+
+            if used.contains(key) {
+                errors.add(ParserError::DuplicateKey(key.to_string()).into());
+            }
+
+            used.insert(key.to_string());
 
             match key {
                 "name" => result.name = Some(value.to_string()),
