@@ -71,14 +71,12 @@ mod tests {
         dbg!(&manifest);
         ValidatedGame::validate_manifest(&manifest).expect("Game could not be validated.");
     }
-    #[ignore = "Known bug: Windows runtime version is handled as mandatory."]
     #[test]
     fn valid_windows_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_windows_without_runtime_version().build();
         dbg!(&manifest);
         ValidatedGame::validate_manifest(&manifest).expect("Game could not be validated.");
     }
-    #[ignore = "Known bug: HTML runtime version is not ignored."]
     #[test]
     fn valid_html_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_html_without_runtime_version().build();
