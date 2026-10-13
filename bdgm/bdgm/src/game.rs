@@ -43,10 +43,11 @@ impl Game {
 }
 
 impl FromStr for Game {
-    type Err = BDGMError;
+    type Err = BDGMErrors;
 
     /// Parses a `Game` from `DISC.BDGM` file contents.
     fn from_str(s: &str) -> Result<Game, Self::Err> {
+        let mut errors = BDGMErrors::default();
         let mut result = Game::new();
 
         let mut lines = s.lines();
@@ -54,7 +55,7 @@ impl FromStr for Game {
             Some(header) => {
                 let split: Vec<_> = header.split('/').collect();
                 if split.len() != 2 || split.first().is_none_or(|x| *x != "BDGM") {
-                    return Err(BDGMError::UnableToParse(ParserError::InvalidHeader));
+                    errors.add(ParserError::InvalidHeader.into());
                 }
                 split.get(1).map(|x| x.to_string())
             }
@@ -79,7 +80,7 @@ impl FromStr for Game {
             let value = split[1];
 
             if key.chars().any(|c| c.is_whitespace()) {
-                return Err(ParserError::WhitespaceInKey(key.to_string()).into());
+                errors.add(ParserError::WhitespaceInKey(key.to_string()).into());
             }
 
             match key {
@@ -103,6 +104,7 @@ impl FromStr for Game {
             }
         }
 
+        errors.evaluate()?;
         Ok(result)
     }
 }
@@ -140,7 +142,7 @@ impl ValidatedGame {
     /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
     /// errors.
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
-        let mut errors = BDGMErrors(Vec::new());
+        let mut errors = BDGMErrors::default();
 
         let bdgm_version = if game.bdgm_version.is_none_or_empty() {
             errors.add(BDGMError::MissingHeaderVersion);

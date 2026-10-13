@@ -83,7 +83,7 @@ impl Display for BDGMError {
 }
 
 /// A set of BDGM validation errors.
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error, PartialEq, Eq, Default)]
 pub struct BDGMErrors(pub Vec<BDGMError>);
 
 impl BDGMErrors {
