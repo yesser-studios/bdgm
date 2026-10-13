@@ -123,6 +123,7 @@ pub enum ParserError {
     WhitespaceInKey(String),
     LeadingWhitespace(String),
     TrailingWhitespace(String),
+    EmptyValue(String),
     InvalidHeader,
     InvalidRuntime,
 }
@@ -137,6 +138,7 @@ impl Display for ParserError {
             ParserError::TrailingWhitespace(line) => {
                 write!(f, "There is a trailing whitespace in line: {line}")
             }
+            ParserError::EmptyValue(key) => write!(f, "{key} has an empty value!"),
             ParserError::InvalidHeader => write!(f, "Invalid header!"),
             ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
         }

@@ -51,3 +51,16 @@ fn leading_trailing_whitespaces_forbidden() {
             .contains(&ParserError::TrailingWhitespace(" test=should_fail ".to_string()).into())
     );
 }
+
+#[test]
+fn empty_value_forbidden() {
+    let manifest = ManifestBuilder::valid().with_raw("test=").build();
+    dbg!(&manifest);
+
+    assert!(
+        validate_manifest(manifest)
+            .unwrap_err()
+            .0
+            .contains(&ParserError::EmptyValue("test".to_string()).into())
+    )
+}
