@@ -37,6 +37,7 @@ impl ManifestBuilder {
     }
 
     pub fn with(&mut self, key: &str, value: &str) -> &mut Self {
+        self.without(key);
         self.0.push(format!("{key} = {value}"));
         self
     }
