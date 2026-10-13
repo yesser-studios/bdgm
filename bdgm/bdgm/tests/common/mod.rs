@@ -1,5 +1,12 @@
 #![allow(dead_code)]
 
+use std::str::FromStr;
+
+use bdgm::{
+    error::BDGMErrors,
+    game::{Game, ValidatedGame},
+};
+
 pub struct ManifestBuilder(Vec<String>);
 
 impl ManifestBuilder {
@@ -59,33 +66,32 @@ impl ManifestBuilder {
     }
 }
 
-mod tests {
-    use std::str::FromStr;
+pub fn validate_manifest(manifest: String) -> Result<ValidatedGame, BDGMErrors> {
+    let game = Game::from_str(&manifest).expect("Manifest could not be parsed");
+    ValidatedGame::validate(game)
+}
 
+mod tests {
     use super::*;
-    use bdgm::game::{Game, ValidatedGame};
 
     #[test]
     fn valid_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid().build();
         dbg!(&manifest);
-        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
-        ValidatedGame::validate(game).expect("Game could not be validated.");
+        validate_manifest(manifest).expect("Game could not be validated.");
     }
     #[ignore = "Known bug: Windows runtime version is handled as mandatory."]
     #[test]
     fn valid_windows_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_windows_without_runtime_version().build();
         dbg!(&manifest);
-        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
-        ValidatedGame::validate(game).expect("Game could not be validated.");
+        validate_manifest(manifest).expect("Game could not be validated.");
     }
     #[ignore = "Known bug: HTML runtime version is not ignored."]
     #[test]
     fn valid_html_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_html_without_runtime_version().build();
         dbg!(&manifest);
-        let game = Game::from_str(&manifest).expect("Manifest could not be parsed.");
-        ValidatedGame::validate(game).expect("Game could not be validated.");
+        validate_manifest(manifest).expect("Game could not be validated.");
     }
 }
