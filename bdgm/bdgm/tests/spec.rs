@@ -29,3 +29,25 @@ fn spaces_before_equals_forbidden() {
             .contains(&ParserError::WhitespaceInKey("test ".to_string()).into())
     )
 }
+
+#[ignore = "Bug: Leading and trailing whitespaces are not checked"]
+#[test]
+fn leading_trailing_whitespaces_forbidden() {
+    let manifest = ManifestBuilder::valid()
+        .with_raw(" test=should_fail ")
+        .build();
+
+    dbg!(&manifest);
+
+    let errors = validate_manifest(manifest).unwrap_err();
+    assert!(
+        errors
+            .0
+            .contains(&ParserError::LeadingWhitespace(" test=should_fail ".to_string()).into())
+    );
+    assert!(
+        errors
+            .0
+            .contains(&ParserError::TrailingWhitespace(" test=should_fail ".to_string()).into())
+    );
+}

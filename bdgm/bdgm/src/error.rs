@@ -121,6 +121,8 @@ impl Display for BDGMErrors {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParserError {
     WhitespaceInKey(String),
+    LeadingWhitespace(String),
+    TrailingWhitespace(String),
     InvalidHeader,
     InvalidRuntime,
 }
@@ -129,6 +131,12 @@ impl Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParserError::WhitespaceInKey(key) => write!(f, "There is whitespace in key: {key}"),
+            ParserError::LeadingWhitespace(line) => {
+                write!(f, "There is a leading whitespace in line: {line}")
+            }
+            ParserError::TrailingWhitespace(line) => {
+                write!(f, "There is a trailing whitespace in line: {line}")
+            }
             ParserError::InvalidHeader => write!(f, "Invalid header!"),
             ParserError::InvalidRuntime => write!(f, "Invalid runtime value!"),
         }
