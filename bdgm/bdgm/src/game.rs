@@ -7,7 +7,10 @@ use std::{
 };
 
 use crate::{
-    error::{BDGMError, BDGMErrors, ExecutableError, IdFormatError, ParserError},
+    error::{
+        BDGMError::{self, ArgsInvalid, RuntimeArgsInvalid},
+        BDGMErrors, ExecutableError, IdFormatError, ParserError,
+    },
     runtime::Runtime,
 };
 
@@ -98,18 +101,16 @@ impl FromStr for Game {
                 "id" => result.id = Some(value.to_string()),
                 "version" => result.version = Some(value.to_string()),
                 "executable" => result.executable = Some(value.to_string()),
-                "args" => {
-                    result.args = serde_json::from_str(value)
-                        .map_err(|e: serde_json::Error| BDGMError::ArgsInvalid(e.to_string()))?
-                }
+                "args" => match serde_json::from_str(value) {
+                    Ok(v) => result.args = v,
+                    Err(e) => errors.add(ArgsInvalid(e.to_string())),
+                },
                 "runtime" => result.runtime = Some(value.to_string()),
                 "runtime_version" => result.runtime_version = Some(value.to_string()),
-                "runtime_args" => {
-                    result.runtime_args =
-                        serde_json::from_str(value).map_err(|e: serde_json::Error| {
-                            BDGMError::RuntimeArgsInvalid(e.to_string())
-                        })?
-                }
+                "runtime_args" => match serde_json::from_str(value) {
+                    Ok(v) => result.runtime_args = v,
+                    Err(e) => errors.add(RuntimeArgsInvalid(e.to_string())),
+                },
                 _ => {}
             }
         }
