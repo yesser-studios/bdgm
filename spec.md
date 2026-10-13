@@ -14,7 +14,7 @@ BDGM is a UDF specification for storing a cross-platform game.
 DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 - BPF is a text format in UTF-8 encoding.
 - First line must be a format/version specifier: `BDGM/<version>`
-- The rest of the file are key-value pairs separated with the first `=`. Spaces before `=` are forbidden. Whitespace in the value are not ignored.
+- The rest of the file are key-value pairs separated with the first `=`. Spaces before `=` (in the key) are forbidden. Whitespace in the value are not ignored.
 - Leading and trailing whitespaces of the line are forbidden.
 - Empty values are forbidden; if a key is optional, omit it instead of setting it to empty.
 - Duplicate keys are forbidden.
