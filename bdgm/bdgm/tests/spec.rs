@@ -14,7 +14,6 @@ fn header_enforced() {
     );
 }
 
-#[ignore = "Known bug: Parser skips keys with whitespace instead of failing"]
 #[test]
 fn spaces_before_equals_forbidden() {
     let manifest = ManifestBuilder::valid()
@@ -23,10 +22,10 @@ fn spaces_before_equals_forbidden() {
 
     dbg!(&manifest);
 
-    assert_eq!(
-        validate_manifest(manifest).unwrap_err(),
-        BDGMErrors(vec![BDGMError::UnableToParse(
-            ParserError::WhitespaceInKey("test ".to_string())
-        )])
+    assert!(
+        validate_manifest(manifest)
+            .unwrap_err()
+            .0
+            .contains(&ParserError::WhitespaceInKey("test ".to_string()).into())
     )
 }
