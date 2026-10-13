@@ -83,6 +83,10 @@ impl FromStr for Game {
                 errors.add(ParserError::WhitespaceInKey(key.to_string()).into());
             }
 
+            if value.is_empty() {
+                errors.add(ParserError::EmptyValue(key.to_string()).into());
+            }
+
             match key {
                 "name" => result.name = Some(value.to_string()),
                 "id" => result.id = Some(value.to_string()),
