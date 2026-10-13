@@ -328,8 +328,8 @@ impl ValidatedGame {
         Ok(result)
     }
 
-    pub fn validate_manifest(manifest: String) -> Result<Self, BDGMErrors> {
-        let game = Game::from_str(&manifest)?;
+    pub fn validate_manifest(manifest: &str) -> Result<Self, BDGMErrors> {
+        let game = Game::from_str(manifest)?;
         Self::validate(game)
     }
 

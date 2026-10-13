@@ -2,7 +2,6 @@ use std::{
     fs,
     io::{self, Read},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 pub use hadris_udf::UdfRevision;
@@ -10,7 +9,7 @@ use hadris_udf::write::{SimpleDir, SimpleFile, UdfWriteOptions, UdfWriter};
 
 use crate::{
     error::{BDGMError, EntryError},
-    game::{Game, ValidatedGame},
+    game::ValidatedGame,
 };
 
 /// A single filesystem file or directory entry.
@@ -127,8 +126,7 @@ impl Entry {
                 let mut contents = String::new();
                 manifest.read_to_string(&mut contents)?;
 
-                let game = Game::from_str(&contents)?;
-                let game = ValidatedGame::validate(game)?;
+                let game = ValidatedGame::validate_manifest(&contents)?;
                 let executable = game.executable();
 
                 let mut app_dir_children = Vec::new();

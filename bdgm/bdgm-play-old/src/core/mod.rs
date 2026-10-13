@@ -1,7 +1,6 @@
-use std::{fs::File, io::Read, process::ExitStatus, str::FromStr};
-
-use bdgm::game::{Game, ValidatedGame};
+use bdgm::game::ValidatedGame;
 use platform_dirs::AppDirs;
+use std::{fs::File, io::Read, process::ExitStatus};
 
 use crate::{
     cli::args::Args,
@@ -28,9 +27,7 @@ pub fn read_manifest(args: &Args) -> anyhow::Result<String> {
 pub async fn run_sanitized(args: Args, verbose: bool) -> anyhow::Result<ExitStatus> {
     let app_dirs = AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)?;
     let manifest = read_manifest(&args)?;
-
-    let game = Game::from_str(&manifest)?;
-    let game = ValidatedGame::validate(game)?;
+    let game = ValidatedGame::validate_manifest(&manifest)?;
 
     println!("Found: {} version {}", game.name(), game.version());
     install(&game, &app_dirs, &args)?;

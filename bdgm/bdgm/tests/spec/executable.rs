@@ -9,7 +9,7 @@ fn absolute_path_enforced() {
     dbg!(&manifest);
 
     assert!(
-        ValidatedGame::validate_manifest(manifest)
+        ValidatedGame::validate_manifest(&manifest)
             .expect_err("Manifest should not be valid")
             .0
             .contains(&ExecutableError::IsAbsolute.into())
@@ -24,7 +24,7 @@ fn current_dir_symbol_enforced() {
     dbg!(&manifest);
 
     assert!(
-        ValidatedGame::validate_manifest(manifest)
+        ValidatedGame::validate_manifest(&manifest)
             .expect_err("Manifest should not be valid")
             .0
             .contains(&ExecutableError::ContainsCurrentDir.into())
@@ -39,7 +39,7 @@ fn parent_dir_symbol_enforced() {
     dbg!(&manifest);
 
     assert!(
-        ValidatedGame::validate_manifest(manifest)
+        ValidatedGame::validate_manifest(&manifest)
             .expect_err("Manifest should not be valid")
             .0
             .contains(&ExecutableError::ContainsParentDir.into())
@@ -54,7 +54,7 @@ fn backslash_separated_enforced() {
     dbg!(&manifest);
 
     assert!(
-        ValidatedGame::validate_manifest(manifest)
+        ValidatedGame::validate_manifest(&manifest)
             .expect_err("Manifest should not be valid")
             .0
             .contains(&ExecutableError::BackslashSeparated.into())
