@@ -1,3 +1,4 @@
+mod args;
 mod executable;
 mod id;
 mod manifest;
