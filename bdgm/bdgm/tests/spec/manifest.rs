@@ -1,8 +1,5 @@
-use bdgm::error::{BDGMError, BDGMErrors, ParserError};
-
 use crate::common::{ManifestBuilder, validate_manifest};
-
-mod common;
+use bdgm::error::{BDGMError, BDGMErrors, ParserError};
 
 #[test]
 fn header_enforced() {
