@@ -81,8 +81,13 @@ impl FromStr for Game {
                 None => continue,
             };
 
-            if key.chars().any(|c| c.is_whitespace()) {
+            if line.chars().nth(0).is_some_and(|c| c.is_whitespace()) {
+                errors.add(ParserError::LeadingWhitespace(line.to_string()).into());
+            } else if key.chars().any(|c| c.is_whitespace()) {
                 errors.add(ParserError::WhitespaceInKey(key.to_string()).into());
+            }
+            if line.chars().nth_back(0).is_some_and(|c| c.is_whitespace()) {
+                errors.add(ParserError::TrailingWhitespace(line.to_string()).into());
             }
 
             if value.is_empty() {
