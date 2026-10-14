@@ -1,4 +1,4 @@
 [workspace]
 resolver = "3"
-members = ["bdgm", "bdgm-build", "bdgm-play-old"]
+members = ["bdgm", "bdgm-build", "bdgm-play"]
 
