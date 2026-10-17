@@ -1,7 +1,6 @@
 use hadris_udf::{UdfDir, UdfVolume};
 use std::{
-    fs::{self, File},
-    path::Path,
+    fs::{self}, io::{Read, Seek}, path::Path,
 };
 #[cfg(windows)]
 use bdgm::error::BDGMError;
@@ -332,7 +331,7 @@ pub fn read_manifest_from_raw_disc(drive: &str) -> anyhow::Result<String> {
 }
 
 pub fn extract_udf_dir(
-    udf: &UdfVolume<File>,
+    udf: &UdfVolume<impl Seek + Read>,
     dir: &UdfDir,
     output_path: &Path,
 ) -> anyhow::Result<()> {
