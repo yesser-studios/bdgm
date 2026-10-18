@@ -110,7 +110,6 @@ These environment variables must be provided by the players. Games may read thes
 - `BDGM_DATA`: The data dir created by the player. This must be persistent between game executions.
 - `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running. The player must not delete it while the game is running.
 - `BDGM_APP`: The path to the `APP` directory the game is running from (differs from disc/BDGM/APP if the player copied from it).
-- `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
 - `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.1`)
 - `WINEPREFIX`: Only if the game is `windows`; must be set to a writable location.
 Games must not assume these paths are on the same storage device.
