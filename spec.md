@@ -32,10 +32,14 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
         - Uses lowercase ASCII characters, digits and hyphens. Spaces are not permitted.
         - This ID must not change between versions.
         - The ID must have at least three components.
-        - The first part of the ID must be the developer/publisher's domain (io.github.company, etc. are fine) and the second part is the game's identifier.
+        - The first part of the ID should be the developer/publisher's domain (io.github.company, etc. are fine) and the second part should be the game's identifier.
         - Separating different components in a larger piece of work within the ID is allowed, such as: `com.example.example-game.main-game`
         - Example: `com.example.my-game`.
-    - `version`: The version of the stored game, in a text representation. Semantic versioning with major, minor and patch (and possibly build) versions is suggested but not required. All changes to the contents of APP must be in a new version. Mandatory.
+    - `version`: The version of the stored game, in a text representation. Mandatory.
+        - Semantic versioning with major, minor and patch (and possibly build) versions is suggested but not required.
+        - All changes to the contents of APP must be in a new version.
+        - The version must resolve to the name of a single directory.
+        - versions ".", "..", "CON", "PRN", "AUX", "NUL", "COM[0-9]", "LPT[0-9]"; versions ending with ".part", ".lock", ".", " "; and characters '/', '\', ':', '*', '?', '"', '<', '>', '|' are not allowed.
     - `runtime`: The runtime used to run the stored game. This is one of `java`, `dotnet`, `python`, `html`, `windows`. Other options may be added by future versions of the spec. Mandatory.
     - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows` and ignored for `html`, otherwise mandatory.
     - `executable`: The path to the executable to run using the runtime. This is a path to the file relative to the BDGM/APP directory. Mandatory.

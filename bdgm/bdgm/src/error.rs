@@ -29,6 +29,7 @@ pub enum BDGMError {
     DiscFileInvalid,
     MandatoryFieldMissing(String),
     IdFormatInvalid(IdFormatError),
+    VersionInvalid(VersionFormatError),
     RuntimeInvalid(String),
     ExecutablePathForbidden(ExecutableError),
     AppDirectoryMissing,
@@ -57,6 +58,9 @@ impl Display for BDGMError {
             }
             BDGMError::IdFormatInvalid(reason) => {
                 write!(f, "The format of the ID is invalid, because: {reason}")
+            }
+            BDGMError::VersionInvalid(reason) => {
+                write!(f, "The format of the version is invalid, because: {reason}")
             }
             BDGMError::RuntimeInvalid(runtime) => write!(
                 f,
@@ -183,7 +187,7 @@ impl Display for IdFormatError {
                 "The ID contains whitespace characters. Use dashes to separate words instead."
             ),
             IdFormatError::ContainsForbiddenCharacter(character) => {
-                write!(f, "The ID contains a forbidden character: {character}")
+                write!(f, "The ID contains a forbidden character: '{character}'")
             }
             IdFormatError::IncorrectStructure => {
                 write!(
@@ -198,6 +202,32 @@ impl Display for IdFormatError {
 impl From<IdFormatError> for BDGMError {
     fn from(value: IdFormatError) -> Self {
         BDGMError::IdFormatInvalid(value)
+    }
+}
+
+/// Represents a single version validation error.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum VersionFormatError {
+    ContainsForbiddenCharacter(char),
+    EndsWithForbiddenSequence(String),
+    ForbiddenVersion(String),
+}
+
+impl Display for VersionFormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ContainsForbiddenCharacter(c) => {
+                write!(f, "The version contains a forbidden character: '{c}'")
+            }
+            Self::EndsWithForbiddenSequence(s) => write!(f, "The version must not end with '{s}'"),
+            Self::ForbiddenVersion(v) => write!(f, "The specified version '{v}' is forbidden"),
+        }
+    }
+}
+
+impl From<VersionFormatError> for BDGMError {
+    fn from(value: VersionFormatError) -> Self {
+        BDGMError::VersionInvalid(value)
     }
 }
 
