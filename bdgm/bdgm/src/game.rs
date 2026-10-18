@@ -264,13 +264,26 @@ impl ValidatedGame {
                         .add(VersionFormatError::ContainsForbiddenCharacter(forbidden_char).into());
                 }
             }
-            for forbidden_ver in ["..", ".", "CON", "PRN", "AUX", "NUL"]
+            for forbidden_ver in ["..", "."] {
+                if version.to_lowercase() == forbidden_ver.to_lowercase() {
+                    errors.add(
+                        VersionFormatError::ForbiddenVersion(forbidden_ver.to_string()).into(),
+                    );
+                }
+            }
+            for forbidden_seq in ["CON", "PRN", "AUX", "NUL"]
                 .into_iter()
                 .map(str::to_string)
                 .chain((0..=9).flat_map(|n| [format!("COM{n}"), format!("LPT{n}")]))
             {
-                if version.to_lowercase() == forbidden_ver.to_lowercase() {
-                    errors.add(VersionFormatError::ForbiddenVersion(forbidden_ver).into());
+                if version
+                    .to_lowercase()
+                    .contains(&forbidden_seq.to_lowercase())
+                {
+                    errors.add(
+                        VersionFormatError::ContainsForbiddenSequence(forbidden_seq.to_string())
+                            .into(),
+                    );
                 }
             }
             for forbidden_end in [".part", ".lock", ".", " "] {

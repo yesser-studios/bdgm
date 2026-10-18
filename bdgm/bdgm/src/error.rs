@@ -209,6 +209,7 @@ impl From<IdFormatError> for BDGMError {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum VersionFormatError {
     ContainsForbiddenCharacter(char),
+    ContainsForbiddenSequence(String),
     EndsWithForbiddenSequence(String),
     ForbiddenVersion(String),
 }
@@ -219,6 +220,7 @@ impl Display for VersionFormatError {
             Self::ContainsForbiddenCharacter(c) => {
                 write!(f, "The version contains a forbidden character: '{c}'")
             }
+            Self::ContainsForbiddenSequence(s) => write!(f, "The version must not contain '{s}'"),
             Self::EndsWithForbiddenSequence(s) => write!(f, "The version must not end with '{s}'"),
             Self::ForbiddenVersion(v) => write!(f, "The specified version '{v}' is forbidden"),
         }
