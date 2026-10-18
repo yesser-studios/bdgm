@@ -240,7 +240,7 @@ impl ValidatedGame {
                 ));
             }
             if !(id.contains('.')
-                && id.split('.').count() >= 2
+                && id.split('.').count() >= 3
                 && id.split('.').all(|seg| {
                     !seg.is_empty()
                         && !seg.starts_with('-')
