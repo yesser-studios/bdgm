@@ -39,7 +39,7 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
         - Semantic versioning with major, minor and patch (and possibly build) versions is suggested but not required.
         - All changes to the contents of APP must be in a new version.
         - The version must resolve to the name of a single directory.
-        - versions ".", "..", "CON", "PRN", "AUX", "NUL", "COM[0-9]", "LPT[0-9]"; versions ending with ".part", ".lock", ".", " "; and characters '/', '\', ':', '*', '?', '"', '<', '>', '|' are not allowed.
+        - versions ".", ".."; versions containing "CON", "PRN", "AUX", "NUL", "COM[0-9]", "LPT[0-9]"; versions ending with ".part", ".lock", ".", " "; and characters '/', '\', ':', '*', '?', '"', '<', '>', '|' are not allowed.
     - `runtime`: The runtime used to run the stored game. This is one of `java`, `dotnet`, `python`, `html`, `windows`. Other options may be added by future versions of the spec. Mandatory.
     - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows` and ignored for `html`, otherwise mandatory.
     - `executable`: The path to the executable to run using the runtime. This is a path to the file relative to the BDGM/APP directory. Mandatory.
