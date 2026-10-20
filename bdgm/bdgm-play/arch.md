@@ -415,7 +415,7 @@ build_command(&InstalledGame, runtime: Option<&Path>) -> Result<tokio::process::
 build_bin_command(default_runtime: &Path, executable: &Path, install_dir: &Path, runtime: Option<&Path>, runtime_args: &[&str], args: &[&str], envvars: &HashMap<&'static str, String>) -> Result<tokio::process::Command> - generates a command.
 Sets working directory to executable.parent
 
-run_command(tokio::process::Command) -> Result<LaunchHandle> - Maps io::NotFound to RuntimeNotFound (if not running a Windows game natively on Windows)
+run_command(tokio::process::Command, &bdgm::Runtime) -> Result<LaunchHandle> - Maps io::NotFound to RuntimeNotFound (if not running a Windows game natively on Windows; if Windows executable is not found on Windows, returns LaunchError::IoError)
 
 ### state
 
