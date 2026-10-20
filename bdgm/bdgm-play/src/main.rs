@@ -20,12 +20,12 @@ fn main() -> anyhow::Result<()> {
         None => None,
     };
 
-    let status = match args.location {
-        Some(_) => match tokio::runtime::Builder::new_multi_thread()
+    let status = match args.location.clone() {
+        Some(location) => match tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
         {
-            Ok(runtime) => runtime.block_on(run(args)).map(Some),
+            Ok(runtime) => runtime.block_on(run(args, location)),
             Err(e) => Err(e.into()),
         },
         None => {

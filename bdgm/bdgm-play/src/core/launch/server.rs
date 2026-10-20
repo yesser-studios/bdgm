@@ -47,7 +47,9 @@ impl HtmlServer {
         let directory = dir.to_path_buf();
         let task = tokio::spawn(async move {
             let app = Router::new().fallback_service(ServeDir::new(directory));
-            axum::serve(listener, app).await
+            axum::serve(listener, app)
+                .await
+                .map_err(|e| AppError::RunningError(e.into()))
         });
         let abort = task.abort_handle();
 
