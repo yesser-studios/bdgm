@@ -78,3 +78,79 @@ pub(super) fn create_game_dirs(game_dirs: &GameDirs) -> io::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::core::test_utils::{TestEnv, manifest, validated_game};
+
+    fn test_game() -> ValidatedGame {
+        validated_game(&manifest(
+            "com.example.test",
+            "1.2.3",
+            "python",
+            "sub/game.py",
+            "[]",
+            "[]",
+        ))
+    }
+
+    #[test]
+    fn game_dirs_follow_the_documented_tree() {
+        let env = TestEnv::new();
+        let game = test_game();
+        let dirs = env.game_dirs(&game);
+
+        let root = env.app_dirs.data_dir.join("games").join("com.example.test");
+        assert_eq!(dirs.root(), root);
+        assert_eq!(dirs.install_dir(), root.join("app").join("1.2.3"));
+        assert_eq!(dirs.data(), root.join("data"));
+        assert_eq!(
+            dirs.cache(),
+            env.app_dirs
+                .cache_dir
+                .join("games")
+                .join("com.example.test")
+        );
+        assert_eq!(
+            dirs.executable(),
+            root.join("app").join("1.2.3").join("sub/game.py")
+        );
+        assert_eq!(dirs.id(), "com.example.test");
+        assert_eq!(
+            get_install_dir_path("com.example.test", "1.2.3", &env.app_dirs),
+            dirs.install_dir()
+        );
+    }
+
+    #[test]
+    fn disc_paths_point_inside_the_bdgm_directory() {
+        let root = Path::new("/tmp/disc");
+
+        assert_eq!(
+            get_disc_manifest_path(root),
+            root.join("BDGM").join("DISC.BDGM")
+        );
+        assert_eq!(get_disc_app_dir_path(root), root.join("BDGM").join("APP"));
+    }
+
+    #[test]
+    fn create_game_dirs_creates_data_cache_and_install_parent() {
+        let env = TestEnv::new();
+        let dirs = env.game_dirs(&test_game());
+
+        create_game_dirs(&dirs).expect("create game directories");
+
+        assert!(dirs.data().is_dir());
+        assert!(dirs.cache().is_dir());
+        assert!(
+            dirs.install_dir()
+                .parent()
+                .expect("install parent")
+                .is_dir()
+        );
+        assert!(!dirs.install_dir().exists());
+    }
+}

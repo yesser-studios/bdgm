@@ -112,3 +112,147 @@ fn installed_if_available(
 
     Ok(installed.then(|| ResolvedSource::Installed(InstalledGame { game, game_dirs })))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::PathBuf};
+
+    use super::*;
+    use crate::core::test_utils::{RecordingStateHandler, TestEnv, extracted, manifest};
+
+    fn test_manifest() -> String {
+        manifest(
+            "com.example.test",
+            "1.0.0",
+            "windows",
+            "game.exe",
+            "[]",
+            "[]",
+        )
+    }
+
+    fn install_game(
+        env: &TestEnv,
+        disc: &Path,
+        state: &mut RecordingStateHandler,
+    ) -> ValidatedGame {
+        let validated = extracted(disc.to_path_buf())
+            .validate(state)
+            .expect("validate test disc");
+
+        validated
+            .install(&env.app_dirs, state)
+            .expect("install test game")
+            .game
+    }
+
+    #[test]
+    fn mounted_disc_returns_an_extracted_source_when_not_installed() {
+        let env = TestEnv::new();
+        let disc = env.disc(&test_manifest(), "game.exe");
+        let mut state = RecordingStateHandler::new();
+
+        let resolved = resolve(
+            Source::new(disc.clone(), SourceKind::MountedDisc),
+            &env.app_dirs,
+            &mut state,
+        )
+        .expect("resolve mounted disc");
+
+        match resolved {
+            ResolvedSource::Extracted(source) => assert_eq!(source.path, disc),
+            ResolvedSource::Installed(_) => panic!("game should not be installed"),
+        }
+        assert_eq!(state.states.len(), 1);
+        assert!(matches!(
+            state.states.first(),
+            Some(State::Extracting(None))
+        ));
+    }
+
+    #[test]
+    fn mounted_disc_returns_the_installation_when_available() {
+        let env = TestEnv::new();
+        let disc = env.disc(&test_manifest(), "game.exe");
+        let mut install_state = RecordingStateHandler::new();
+        let game = install_game(&env, &disc, &mut install_state);
+        let mut state = RecordingStateHandler::new();
+
+        let resolved = resolve(
+            Source::new(disc, SourceKind::MountedDisc),
+            &env.app_dirs,
+            &mut state,
+        )
+        .expect("resolve mounted disc");
+
+        match resolved {
+            ResolvedSource::Installed(installed) => {
+                assert_eq!(installed.game.id(), game.id());
+                assert_eq!(installed.game.version(), game.version());
+                assert!(installed.game_dirs.executable().is_file());
+            }
+            ResolvedSource::Extracted(_) => panic!("game should be installed"),
+        }
+        assert!(matches!(
+            state.states.first(),
+            Some(State::Extracting(None))
+        ));
+    }
+
+    #[test]
+    fn mounted_disc_extracts_when_the_manifest_is_invalid() {
+        let env = TestEnv::new();
+        let root = env.disc_root("disc");
+        TestEnv::write_manifest(&root, "not a manifest");
+        TestEnv::write_executable(&root, "game.exe");
+        let mut state = RecordingStateHandler::new();
+
+        let resolved = resolve(
+            Source::new(root.clone(), SourceKind::MountedDisc),
+            &env.app_dirs,
+            &mut state,
+        )
+        .expect("resolve mounted disc");
+
+        match resolved {
+            ResolvedSource::Extracted(source) => assert_eq!(source.path, root),
+            ResolvedSource::Installed(_) => panic!("invalid manifest cannot be installed"),
+        }
+    }
+
+    #[test]
+    fn image_source_rejects_non_udf_data() {
+        let env = TestEnv::new();
+        let path = env.root().join("not-udf.img");
+        fs::write(&path, b"not a udf image").expect("write invalid image");
+        let mut state = RecordingStateHandler::new();
+
+        let result = resolve(
+            Source::new(path, SourceKind::Image),
+            &env.app_dirs,
+            &mut state,
+        );
+
+        assert!(matches!(result, Err(AppError::ExtractError(_))));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn raw_disc_source_is_unsupported_outside_windows() {
+        let env = TestEnv::new();
+        let mut state = RecordingStateHandler::new();
+
+        let result = resolve(
+            Source::new(PathBuf::from("ignored"), SourceKind::RawDisc),
+            &env.app_dirs,
+            &mut state,
+        );
+
+        assert!(matches!(
+            result,
+            Err(AppError::UnsupportedOnThisPlatform(
+                UnsupportedOperation::ReadingRawDiscs
+            ))
+        ));
+    }
+}

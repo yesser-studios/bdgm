@@ -60,3 +60,55 @@ pub enum UnsupportedOperation {
     #[error("Reading raw discs")]
     ReadingRawDiscs,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_error_messages_are_human_readable() {
+        assert_eq!(
+            AppError::NoAppDirs.to_string(),
+            "Failed to parse app directories"
+        );
+        assert_eq!(
+            AppError::LaunchError(LaunchError::RuntimeNotFound(PathBuf::from("java"))).to_string(),
+            "Runtime java was not found, is it installed?"
+        );
+        assert_eq!(
+            AppError::LaunchError(LaunchError::PortTaken(1234)).to_string(),
+            "Port 1234 is already in use"
+        );
+        assert_eq!(
+            AppError::UnsupportedOnThisPlatform(UnsupportedOperation::ReadingRawDiscs).to_string(),
+            "Reading raw discs is not supported on this platform."
+        );
+        assert_eq!(
+            AppError::UnsupportedOperation(UnsupportedOperation::ReadingRawDiscs).to_string(),
+            "Reading raw discs is not supported."
+        );
+        assert_eq!(AppError::Other("oops".to_string()).to_string(), "oops");
+    }
+
+    #[test]
+    fn wrapped_errors_keep_their_messages() {
+        let io_error = || io::Error::other("underlying error");
+
+        assert_eq!(
+            AppError::from(ExtractError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(InstallError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(LaunchError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(RunningError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+    }
+}
