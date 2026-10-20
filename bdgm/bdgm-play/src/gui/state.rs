@@ -55,7 +55,7 @@ pub(crate) enum Phase {
 // Killable handle for whatever is running behind the modal.
 #[derive(Clone)]
 pub(crate) enum PlayHandle {
-    Process(crate::core::launch::ProcessHandle),
+    Process(crate::core_ass::launch::ProcessHandle),
     Server { abort: tokio::task::AbortHandle },
 }
 
@@ -78,7 +78,7 @@ pub(crate) struct StartedSession {
 }
 
 pub(crate) enum StartedHandle {
-    Process(crate::core::launch::ProcessHandle),
+    Process(crate::core_ass::launch::ProcessHandle),
     Server {
         join: tokio::task::JoinHandle<anyhow::Result<()>>,
         abort: tokio::task::AbortHandle,

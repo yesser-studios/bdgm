@@ -11,14 +11,14 @@ use tempfile::{TempDir, tempdir};
 
 use crate::{
     cli::args::Args,
-    core::{dump::extract_udf_dir, error::IoError},
+    core_ass::{dump::extract_udf_dir, error::IoError},
 };
 
 #[cfg(windows)]
-use crate::core::dirs::GameDirs;
+use crate::core_ass::dirs::GameDirs;
 
 #[cfg(windows)]
-use crate::core::dump::{
+use crate::core_ass::dump::{
     dump_disc_with_progress, raw_disc_has_manifest, read_manifest_from_raw_disc,
 };
 #[cfg(windows)]
