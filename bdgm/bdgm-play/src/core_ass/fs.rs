@@ -6,7 +6,7 @@ use std::{
 
 use fs_extra::dir;
 
-use crate::core::error::IoError;
+use crate::core_ass::error::IoError;
 
 pub fn acquire_lock(path: &Path, blocking: bool, verbose: bool) -> Result<File, IoError> {
     // If the parent does not exist, locking will probably fail, but we'll still try.

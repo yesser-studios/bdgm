@@ -4,7 +4,7 @@ use std::{fs::File, io::Read, process::ExitStatus};
 
 use crate::{
     cli::args::Args,
-    core::{dirs::try_get_manifest_path, error::AppError, install::install, launch::run_game},
+    core_ass::{dirs::try_get_manifest_path, error::AppError, install::install, launch::run_game},
 };
 
 pub mod dirs;

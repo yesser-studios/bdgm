@@ -5,7 +5,7 @@ use platform_dirs::AppDirs;
 
 use crate::{
     cli::args::Args,
-    core::error::{
+    core_ass::error::{
         AppError,
         IoError::{self},
     },

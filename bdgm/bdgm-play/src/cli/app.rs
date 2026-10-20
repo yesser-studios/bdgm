@@ -2,7 +2,7 @@ use std::process::ExitStatus;
 
 use crate::{
     cli::args::Args,
-    core::{image::resolve_image_args_with_progress, run_sanitized},
+    core_ass::{image::resolve_image_args_with_progress, run_sanitized},
 };
 
 pub async fn run(args: Args) -> anyhow::Result<ExitStatus> {

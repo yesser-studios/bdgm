@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 use crate::{
     cli::args::Args,
-    core::{
+    core_ass::{
         dirs::GameDirs,
         image::resolve_image_args_with_progress,
         install::install,
@@ -148,7 +148,7 @@ async fn finish_async(prep: Prepared, slot: &Slot) -> Result<GameInfo, String> {
 }
 
 pub(crate) async fn wait_process_task(
-    handle: crate::core::launch::ProcessHandle,
+    handle: crate::core_ass::launch::ProcessHandle,
 ) -> Result<Option<i32>, String> {
     wait_for_process(handle).await.map_err(|e| format!("{e:#}"))
 }
@@ -164,6 +164,6 @@ pub(crate) async fn wait_server_task(
     }
 }
 
-pub(crate) async fn kill_process_task(handle: crate::core::launch::ProcessHandle) {
+pub(crate) async fn kill_process_task(handle: crate::core_ass::launch::ProcessHandle) {
     kill_process(&handle).await;
 }

@@ -45,7 +45,7 @@ fn handle_game_started_err(state: &mut AppState, err: String) -> Task<Message> {
 
 fn attach_process_session(
     state: &mut AppState,
-    proc: crate::core::launch::ProcessHandle,
+    proc: crate::core_ass::launch::ProcessHandle,
     tempdir: Option<TempDir>,
 ) -> Task<Message> {
     state.playing_handle = Some(PlayHandle::Process(proc.clone()));
