@@ -113,15 +113,18 @@ fn unique_port(id: &str, on_state: &mut dyn StateHandler) -> Result<u16> {
 }
 
 fn find_free_port(ports: &BiMap<String, u16>) -> Result<u16> {
+    let mut claimed_listeners = Vec::new();
+
     for _ in 0..5000 {
         let listener =
             std::net::TcpListener::bind(("127.0.0.1", 0)).map_err(LaunchError::IoError)?;
         let port = listener.local_addr().map_err(LaunchError::IoError)?.port();
-        drop(listener);
 
         if ports.get_by_right(&port).is_none() {
             return Ok(port);
         }
+
+        claimed_listeners.push(listener);
     }
 
     Err(AppError::Other(
