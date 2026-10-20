@@ -89,3 +89,57 @@ pub(super) struct InstalledGame {
     pub(super) game: ValidatedGame,
     pub(super) game_dirs: GameDirs,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::core::test_utils::{RecordingStateHandler, TestEnv, extracted, manifest};
+
+    #[test]
+    fn constructors_store_the_source_and_runtime() {
+        let request = LaunchRequest::new(
+            Source::new(PathBuf::from("disc"), SourceKind::MountedDisc),
+            Some(PathBuf::from("runtime")),
+        );
+
+        assert_eq!(request.source.path, PathBuf::from("disc"));
+        assert!(matches!(request.source.kind, SourceKind::MountedDisc));
+        assert_eq!(request.runtime, Some(PathBuf::from("runtime")));
+    }
+
+    #[test]
+    fn validate_and_install_emit_states_and_install_the_game() {
+        let env = TestEnv::new();
+        let disc = env.disc(
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "windows",
+                "game.exe",
+                "[]",
+                "[]",
+            ),
+            "game.exe",
+        );
+        let mut state = RecordingStateHandler::new();
+
+        let validated = extracted(disc.clone())
+            .validate(&mut state)
+            .expect("validate extracted source");
+
+        assert_eq!(validated.path, disc);
+        assert_eq!(validated.game.id(), "com.example.test");
+        assert!(matches!(state.states.first(), Some(State::Validating)));
+
+        let installed = validated
+            .install(&env.app_dirs, &mut state)
+            .expect("install validated source");
+
+        assert!(installed.game_dirs.executable().is_file());
+        assert!(state.states.iter().any(
+            |state| matches!(state, State::Installing(game) if game.id() == "com.example.test")
+        ));
+    }
+}

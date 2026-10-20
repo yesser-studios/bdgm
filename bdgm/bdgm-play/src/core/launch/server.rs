@@ -7,6 +7,7 @@ use std::{
 use axum::Router;
 use bimap::BiMap;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+use platform_dirs::AppDirs;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
@@ -89,6 +90,10 @@ pub(super) async fn start_server(
 
 fn unique_port(id: &str, on_state: &mut dyn StateHandler) -> Result<u16> {
     let app_dirs = get_app_dirs()?;
+    unique_port_in(id, &app_dirs, on_state)
+}
+
+fn unique_port_in(id: &str, app_dirs: &AppDirs, on_state: &mut dyn StateHandler) -> Result<u16> {
     let ports_path = app_dirs.data_dir.join("ports.json");
 
     if let Some(parent) = ports_path.parent() {
@@ -175,3 +180,163 @@ const ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'.')
     .remove(b'_')
     .remove(b'~');
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io::{Read, Write},
+        net::TcpStream,
+        time::Duration,
+    };
+
+    use tempfile::tempdir;
+
+    use super::*;
+    use crate::core::test_utils::{RecordingStateHandler, TestEnv};
+
+    #[test]
+    fn save_and_load_ports_round_trips() {
+        let temp = tempdir().expect("create temporary directory");
+        let path = temp.path().join("ports.json");
+        let mut ports = BiMap::new();
+        ports.insert("com.example.one".to_string(), 1234);
+        ports.insert("com.example.two".to_string(), 5678);
+
+        save_ports(&ports, &path).expect("save ports");
+        let mut file = open_file(&path).expect("open ports");
+        let loaded = load_ports(&mut file).expect("load ports");
+
+        assert_eq!(loaded, ports);
+    }
+
+    #[test]
+    fn load_ports_treats_an_empty_file_as_an_empty_map() {
+        let temp = tempdir().expect("create temporary directory");
+        let path = temp.path().join("ports.json");
+        fs::write(&path, b"").expect("write empty ports file");
+
+        let mut file = open_file(&path).expect("open ports");
+        let ports = load_ports(&mut file).expect("load ports");
+
+        assert!(ports.is_empty());
+    }
+
+    #[test]
+    fn load_ports_rejects_invalid_json() {
+        let temp = tempdir().expect("create temporary directory");
+        let path = temp.path().join("ports.json");
+        fs::write(&path, b"not json").expect("write invalid ports file");
+
+        let mut file = open_file(&path).expect("open ports");
+        let result = load_ports(&mut file);
+
+        assert!(matches!(
+            result,
+            Err(AppError::LaunchError(LaunchError::IoError(_)))
+        ));
+    }
+
+    #[test]
+    fn unique_port_persists_and_reuses_ports() {
+        let env = TestEnv::new();
+        let mut state = RecordingStateHandler::new();
+
+        let first =
+            unique_port_in("com.example.one", &env.app_dirs, &mut state).expect("allocate port");
+        let same =
+            unique_port_in("com.example.one", &env.app_dirs, &mut state).expect("reuse port");
+        let other =
+            unique_port_in("com.example.two", &env.app_dirs, &mut state).expect("allocate port");
+
+        assert_eq!(first, same);
+        assert_ne!(first, other);
+
+        let ports_path = env.app_dirs.data_dir.join("ports.json");
+        let mut file = open_file(&ports_path).expect("open ports");
+        let ports = load_ports(&mut file).expect("load ports");
+        assert_eq!(ports.get_by_left("com.example.one"), Some(&first));
+        assert_eq!(ports.get_by_left("com.example.two"), Some(&other));
+    }
+
+    #[test]
+    fn unique_port_returns_a_persisted_assignment() {
+        let env = TestEnv::new();
+        fs::create_dir_all(&env.app_dirs.data_dir).expect("create data directory");
+        let ports_path = env.app_dirs.data_dir.join("ports.json");
+        let mut ports = BiMap::new();
+        ports.insert("com.example.one".to_string(), 4321);
+        save_ports(&ports, &ports_path).expect("save ports");
+        let mut state = RecordingStateHandler::new();
+
+        let port =
+            unique_port_in("com.example.one", &env.app_dirs, &mut state).expect("look up port");
+
+        assert_eq!(port, 4321);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn html_server_serves_files_and_reports_its_url() {
+        let temp = tempdir().expect("create temporary directory");
+        fs::write(temp.path().join("index.html"), b"<h1>hello</h1>").expect("write index");
+        let server = HtmlServer::start(temp.path(), 0)
+            .await
+            .expect("start HTML server");
+        let url = server.get_url().to_string();
+        let authority = url
+            .strip_prefix("http://")
+            .expect("HTTP URL")
+            .trim_end_matches('/')
+            .to_string();
+
+        let mut stream = TcpStream::connect(authority.as_str()).expect("connect to HTML server");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("set read timeout");
+        stream
+            .write_all(
+                format!(
+                    "GET /index.html HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .expect("send HTTP request");
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .expect("read HTTP response");
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("<h1>hello</h1>"));
+
+        server.kill();
+    }
+
+    #[tokio::test]
+    async fn html_server_reports_an_occupied_port() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind test listener");
+        let port = listener.local_addr().expect("read listener address").port();
+        let temp = tempdir().expect("create temporary directory");
+
+        let result = HtmlServer::start(temp.path(), port).await;
+
+        assert!(matches!(
+            result,
+            Err(AppError::LaunchError(LaunchError::PortTaken(taken))) if taken == port
+        ));
+        drop(listener);
+    }
+
+    #[tokio::test]
+    async fn html_server_url_encodes_the_entry_point() {
+        let temp = tempdir().expect("create temporary directory");
+
+        let server =
+            HtmlServer::start_with_entry_point(temp.path(), 0, "dir/game file.html".to_string())
+                .await
+                .expect("start HTML server");
+
+        assert!(server.get_url().ends_with("/dir/game%20file.html"));
+
+        server.kill();
+    }
+}

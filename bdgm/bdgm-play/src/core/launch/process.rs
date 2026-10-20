@@ -184,3 +184,342 @@ pub(super) fn run_command(
         Err(error) => Err(LaunchError::IoError(error).into()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        ffi::{OsStr, OsString},
+        path::Path,
+    };
+
+    use tempfile::tempdir;
+
+    use super::*;
+    use crate::core::test_utils::{TestEnv, manifest, validated_game};
+
+    fn installed(env: &TestEnv, manifest: &str) -> InstalledGame {
+        env.installed(validated_game(manifest))
+    }
+
+    fn command_args(command: &tokio::process::Command) -> Vec<OsString> {
+        command
+            .as_std()
+            .get_args()
+            .map(|argument| argument.to_os_string())
+            .collect()
+    }
+
+    #[test]
+    fn envvars_include_spec_paths_and_a_wine_prefix_for_windows_games() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "windows",
+                "game.exe",
+                "[]",
+                "[]",
+            ),
+        );
+
+        let envvars = get_envvars(&installed);
+        let data = installed.game_dirs.data();
+        let cache = installed.game_dirs.cache();
+        let app = installed.game_dirs.install_dir();
+        let wineprefix = installed.game_dirs.root().join("wineprefix");
+
+        assert_eq!(
+            envvars.get("BDGM_DATA").map(String::as_str),
+            Some(data.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            envvars.get("BDGM_CACHE").map(String::as_str),
+            Some(cache.to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            envvars.get("BDGM_APP").map(String::as_str),
+            Some(app.to_string_lossy().as_ref())
+        );
+        assert_eq!(envvars.get("BDGM_VERSION").map(String::as_str), Some("1.1"));
+        assert_eq!(
+            envvars.get("WINEPREFIX").map(String::as_str),
+            Some(wineprefix.to_string_lossy().as_ref())
+        );
+        assert!(data.is_absolute());
+        assert!(cache.is_absolute());
+        assert!(app.is_absolute());
+    }
+
+    #[test]
+    fn non_windows_games_do_not_get_a_wine_prefix() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest("com.example.test", "1.0.0", "python", "game.py", "[]", "[]"),
+        );
+
+        let envvars = get_envvars(&installed);
+
+        assert!(!envvars.contains_key("WINEPREFIX"));
+    }
+
+    #[test]
+    fn java_places_the_jar_after_runtime_arguments() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "java",
+                "game.jar",
+                r#"["--foo", "bar"]"#,
+                r#"["-Xmx1g"]"#,
+            ),
+        );
+
+        let command = build_command(&installed, None).expect("build Java command");
+        let executable = installed.game_dirs.executable();
+        let install_dir = installed.game_dirs.install_dir();
+
+        assert_eq!(command.as_std().get_program(), OsStr::new("java"));
+        assert_eq!(
+            command_args(&command),
+            vec![
+                OsString::from("-Xmx1g"),
+                OsString::from("-jar"),
+                executable.into_os_string(),
+                OsString::from("--foo"),
+                OsString::from("bar"),
+            ]
+        );
+        assert_eq!(
+            command.as_std().get_current_dir(),
+            Some(install_dir.as_path())
+        );
+    }
+
+    #[test]
+    fn dotnet_and_python_pass_runtime_arguments_before_the_executable() {
+        let env = TestEnv::new();
+
+        for (runtime, executable) in [("dotnet", "game.dll"), ("python", "game.py")] {
+            let installed = installed(
+                &env,
+                &manifest(
+                    "com.example.test",
+                    "1.0.0",
+                    runtime,
+                    executable,
+                    r#"["--foo"]"#,
+                    r#"["-u"]"#,
+                ),
+            );
+
+            let command = build_command(&installed, None).expect("build command");
+            let expected_executable = installed.game_dirs.executable();
+
+            assert_eq!(command.as_std().get_program(), OsStr::new(runtime));
+            assert_eq!(
+                command_args(&command),
+                vec![
+                    OsString::from("-u"),
+                    expected_executable.into_os_string(),
+                    OsString::from("--foo"),
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn a_custom_runtime_replaces_the_default_binary() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest("com.example.test", "1.0.0", "python", "game.py", "[]", "[]"),
+        );
+
+        let command =
+            build_command(&installed, Some(Path::new("/custom/runtime"))).expect("build command");
+
+        assert_eq!(
+            command.as_std().get_program(),
+            OsStr::new("/custom/runtime")
+        );
+    }
+
+    #[test]
+    fn the_working_directory_is_the_executable_parent() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "python",
+                "sub/game.py",
+                "[]",
+                "[]",
+            ),
+        );
+
+        let command = build_command(&installed, None).expect("build command");
+        let expected_dir = installed.game_dirs.install_dir().join("sub");
+
+        assert_eq!(
+            command.as_std().get_current_dir(),
+            Some(expected_dir.as_path())
+        );
+    }
+
+    #[test]
+    fn html_games_cannot_be_built_as_processes() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "html",
+                "index.html",
+                "[]",
+                "[]",
+            ),
+        );
+
+        assert!(matches!(
+            build_command(&installed, None),
+            Err(AppError::Other(_))
+        ));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn windows_games_use_wine_outside_windows() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "windows",
+                "game.exe",
+                r#"["--foo"]"#,
+                r#"["-u"]"#,
+            ),
+        );
+
+        let command = build_command(&installed, None).expect("build Wine command");
+        let executable = installed.game_dirs.executable();
+
+        assert_eq!(command.as_std().get_program(), OsStr::new("wine"));
+        assert_eq!(
+            command_args(&command),
+            vec![
+                OsString::from("-u"),
+                executable.into_os_string(),
+                OsString::from("--foo"),
+            ]
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_games_run_natively_on_windows() {
+        let env = TestEnv::new();
+        let installed = installed(
+            &env,
+            &manifest(
+                "com.example.test",
+                "1.0.0",
+                "windows",
+                "game.exe",
+                r#"["--foo"]"#,
+                r#"["-u"]"#,
+            ),
+        );
+
+        let command = build_command(&installed, None).expect("build native command");
+        let executable = installed.game_dirs.executable();
+        let install_dir = installed.game_dirs.install_dir();
+
+        assert_eq!(command.as_std().get_program(), executable.as_os_str());
+        assert_eq!(command_args(&command), vec![OsString::from("--foo")]);
+        assert_eq!(
+            command.as_std().get_current_dir(),
+            Some(install_dir.as_path())
+        );
+    }
+
+    #[tokio::test]
+    async fn run_command_reports_a_missing_runtime() {
+        let temp = tempdir().expect("create temporary directory");
+        let missing = temp.path().join("missing-runtime");
+        let command = tokio::process::Command::new(&missing);
+
+        let result = run_command(command, &Runtime::Java);
+
+        assert!(matches!(
+            result,
+            Err(AppError::LaunchError(LaunchError::RuntimeNotFound(path))) if path == missing
+        ));
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn run_command_reports_a_missing_native_windows_executable_as_io() {
+        let temp = tempdir().expect("create temporary directory");
+        let missing = temp.path().join("missing.exe");
+        let command = tokio::process::Command::new(&missing);
+
+        let result = run_command(command, &Runtime::Windows);
+
+        assert!(matches!(
+            result,
+            Err(AppError::LaunchError(LaunchError::IoError(_)))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn run_command_returns_a_waitable_process() {
+        let mut command = tokio::process::Command::new("sh");
+        command.args(["-c", "exit 7"]);
+
+        let handle = run_command(command, &Runtime::Python).expect("spawn shell");
+        let LaunchHandle::GameProcess(process) = handle else {
+            panic!("expected a game process");
+        };
+
+        let status = tokio::time::timeout(Duration::from_secs(5), process.wait())
+            .await
+            .expect("wait timed out")
+            .expect("wait failed")
+            .expect("process should have an exit status");
+
+        assert_eq!(status.code(), Some(7));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn game_process_kill_terminates_the_process() {
+        let mut command = tokio::process::Command::new("sh");
+        command.args(["-c", "sleep 60"]);
+
+        let handle = run_command(command, &Runtime::Python).expect("spawn shell");
+        let LaunchHandle::GameProcess(process) = handle else {
+            panic!("expected a game process");
+        };
+
+        process.kill().await;
+        let status = tokio::time::timeout(Duration::from_secs(5), process.wait())
+            .await
+            .expect("wait timed out")
+            .expect("wait failed")
+            .expect("process should have an exit status");
+
+        assert!(!status.success());
+    }
+}

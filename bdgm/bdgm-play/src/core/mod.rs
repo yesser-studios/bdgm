@@ -6,6 +6,8 @@ mod launch;
 mod request;
 mod resolve;
 mod state;
+#[cfg(test)]
+mod test_utils;
 mod validate;
 
 pub use error::{

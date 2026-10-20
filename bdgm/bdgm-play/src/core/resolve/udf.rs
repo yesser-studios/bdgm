@@ -134,3 +134,35 @@ fn udf_error(error: hadris_udf::Error) -> AppError {
     ))
     .into()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn safe_names_only_allow_a_single_normal_component() {
+        for name in ["file.txt", "dir-file", "a.b", "game"] {
+            assert!(is_safe_name(name), "{name} should be safe");
+        }
+
+        for name in ["", ".", "..", "/absolute", "dir/file", "a/../b"] {
+            assert!(!is_safe_name(name), "{name} should not be safe");
+        }
+    }
+
+    #[test]
+    fn open_udf_volume_rejects_non_udf_data() {
+        let temp = tempdir().expect("create temporary directory");
+        let path = temp.path().join("not-udf");
+        fs::write(&path, b"not a udf volume").expect("write invalid UDF data");
+        let file = File::open(path).expect("open invalid UDF data");
+
+        let result = open_udf_volume(file);
+
+        assert!(matches!(result, Err(AppError::ExtractError(_))));
+    }
+}
