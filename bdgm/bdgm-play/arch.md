@@ -424,7 +424,7 @@ pub trait StateHandler: Send + Sync
 - change_state(&mut self, State) - Displays a new State
 - revert_state(&mut self) - Replaces current display with the last one (reverts itself if called twice)
 
-pub enum State (implements Display, Send, Sync) - used when calling the StateHandler passed by the app:
+pub enum State (implements Display) - used when calling the StateHandler passed by the app:
 
 - StartingExtraction - created by client before extracting is reported
 - Extracting(Option<(u64, u64)>) - bytes currently / bytes total
@@ -440,7 +440,7 @@ Contains error types.
 
 pub type Result<T> = Result<T, AppError>
 
-pub enum AppError (implements From<T> for all referenced error types, Display, Debug, Error, Send, Sync (same for referenced error types)):
+pub enum AppError (implements From<T> for all referenced error types, Display, Debug, Error (same for referenced error types)):
 
 - NoAppDirs
 - ExtractError(ExtractError)
