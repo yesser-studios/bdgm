@@ -23,6 +23,8 @@ pub enum AppError {
     UnsupportedOnThisPlatform(UnsupportedOperation),
     #[error("{0} is not supported.")]
     UnsupportedOperation(UnsupportedOperation),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
     #[error("{0}")]
     Other(String),
 }
