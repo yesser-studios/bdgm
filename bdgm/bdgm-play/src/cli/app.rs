@@ -17,8 +17,8 @@ pub async fn run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitS
         }
     });
     let request = LaunchRequest::new(source, args.runtime);
-    let mut state_handler = CliStateHandler::default();
-    let (game, handle) = launch_request(request, &mut state_handler).await?;
+    let state_handler = CliStateHandler::default();
+    let (game, handle) = launch_request(request, state_handler).await?;
     println!(
         "Playing: {} {} (ID: {})",
         game.name(),

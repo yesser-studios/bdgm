@@ -55,10 +55,10 @@ pub(super) fn launch(request: LaunchRequest) -> Task<Message> {
                 }
             });
 
-            let mut state_handler = GuiStateHandler::new(sender);
+            let state_handler = GuiStateHandler::new(sender);
 
             tokio::spawn(async move {
-                match launch_request(request, &mut state_handler).await {
+                match launch_request(request, state_handler).await {
                     Ok((game, handle)) => {
                         let _ = output
                             .send(Message::GameStarted(game.clone(), handle.clone()))
