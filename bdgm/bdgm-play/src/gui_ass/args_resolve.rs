@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
 #[allow(unused)]
 pub(crate) fn resolve_mounted_disc(args: &mut Args, path: PathBuf) {

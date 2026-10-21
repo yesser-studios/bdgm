@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use iced::Task;
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
 #[cfg(unix)]
 use super::super::{args_resolve::resolve_mounted_disc, dialogs::open_disc_folder};

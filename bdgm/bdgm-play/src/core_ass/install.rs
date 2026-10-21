@@ -5,7 +5,7 @@ use fs_extra::dir::{self, CopyOptions};
 use platform_dirs::AppDirs;
 
 use crate::{
-    cli::args::Args, core_ass::dirs::get_app_dir_path, core_ass::error::IoError,
+    args::Args, core_ass::dirs::get_app_dir_path, core_ass::error::IoError,
     core_ass::fs::acquire_lock,
 };
 

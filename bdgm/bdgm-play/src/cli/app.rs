@@ -1,7 +1,8 @@
 use std::{path::PathBuf, process::ExitStatus, time::Duration};
 
 use crate::{
-    cli::{args::Args, state::CliStateHandler},
+    args::Args,
+    cli::state::CliStateHandler,
     core::{AppError, LaunchRequest, Source, SourceKind, launch_request},
 };
 

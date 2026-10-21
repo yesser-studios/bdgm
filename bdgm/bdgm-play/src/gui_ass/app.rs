@@ -3,7 +3,7 @@ use iced::{
     window::{self, icon},
 };
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
 use super::{state::AppState, update::update, view::view};
 

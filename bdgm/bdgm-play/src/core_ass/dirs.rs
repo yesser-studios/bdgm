@@ -4,7 +4,7 @@ use bdgm::{error::BDGMError, game::ValidatedGame};
 use platform_dirs::AppDirs;
 
 use crate::{
-    cli::args::Args,
+    args::Args,
     core_ass::error::{
         AppError,
         IoError::{self},
