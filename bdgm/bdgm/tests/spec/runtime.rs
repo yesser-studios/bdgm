@@ -6,7 +6,6 @@ fn runtime_not_in_options_enforced() {
     let manifest = ManifestBuilder::valid()
         .with("runtime", "bogus-should-fail")
         .build();
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -22,7 +21,6 @@ fn runtime_version_missing_enforced() {
         .with("runtime", "dotnet")
         .without("runtime_version")
         .build();
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -38,28 +36,28 @@ fn runtime_version_missing_enforced() {
 fn runtime_version_html_not_required() {
     let manifest = ManifestBuilder::valid()
         .with("runtime", "html")
-        .with("runtime_version", "5")
+        .without("runtime_version")
         .build();
-    dbg!(&manifest);
 
     assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
 }
 
 #[test]
-fn runtime_version_html_windows_non_mandatory() {
+fn runtime_version_html_ignored() {
     let manifest = ManifestBuilder::valid()
         .with("runtime", "html")
-        .without("runtime_version")
+        .with("runtime_version", "not-a-real-version")
         .build();
-    dbg!(&manifest);
 
-    assert!(ValidatedGame::validate_manifest(&manifest).is_ok());
+    assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
+}
 
+#[test]
+fn runtime_version_windows_not_required() {
     let manifest = ManifestBuilder::valid()
         .with("runtime", "windows")
         .without("runtime_version")
         .build();
-    dbg!(&manifest);
 
-    assert!(ValidatedGame::validate_manifest(&manifest).is_ok());
+    assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
 }

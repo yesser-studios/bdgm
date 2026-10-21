@@ -445,15 +445,13 @@ impl From<ValidatedGame> for Game {
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
-    use std::{fs::File, io::Read, str::FromStr};
+    use std::str::FromStr;
 
-    use crate::game::ValidatedGame;
-    use crate::{game::Game, runtime::Runtime};
+    use crate::game::{Game, ValidatedGame};
+    use crate::runtime::Runtime;
 
-    #[test]
-    fn game_serializes() {
-        let game = Game {
+    fn sample_game() -> Game {
+        Game {
             bdgm_version: Some("1.1".to_string()),
             name: Some("test".to_string()),
             id: Some("com.example.test".to_string()),
@@ -463,42 +461,58 @@ mod test {
             runtime: Some(Runtime::Windows.to_string()),
             runtime_version: Some("10".to_string()),
             runtime_args: Vec::new(),
-        };
+        }
+    }
 
-        let result = ValidatedGame::validate(game).unwrap().to_string().unwrap();
-        let mut file = File::create("./DISC_write.BDGM").unwrap();
-        write!(file, "{result}").unwrap();
+    #[test]
+    fn game_serializes() {
+        let serialized = ValidatedGame::validate(sample_game())
+            .expect("game should validate")
+            .to_string()
+            .expect("game should serialize");
+
+        assert_eq!(
+            serialized,
+            "BDGM/1.1\n\
+             name=test\n\
+             id=com.example.test\n\
+             version=1.0.0\n\
+             executable=game.exe\n\
+             runtime=windows\n\
+             runtime_version=10\n\
+             args=[]\n\
+             runtime_args=[]\n"
+        );
+    }
+
+    #[test]
+    fn game_serialization_round_trips() {
+        let game = sample_game();
+        let serialized = ValidatedGame::validate(game.clone())
+            .expect("game should validate")
+            .to_string()
+            .expect("game should serialize");
+
+        assert_eq!(Game::from_str(&serialized).unwrap(), game);
     }
 
     #[test]
     fn game_deserializes() {
-        let mut file = File::open("./DISC_read.BDGM").unwrap();
-        let mut result = String::new();
-        file.read_to_string(&mut result).unwrap();
-        let game = Game::from_str(&result).unwrap();
-        assert_eq!(game.name.unwrap(), "test");
-        assert_eq!(game.id.unwrap(), "com.example.test");
-        assert_eq!(game.version.unwrap(), "1.0.0");
-        assert_eq!(game.executable.unwrap(), "game.exe");
+        let game = Game::from_str(include_str!("../DISC_read.BDGM")).unwrap();
+        assert_eq!(game.bdgm_version.as_deref(), Some("1.1"));
+        assert_eq!(game.name.as_deref(), Some("test"));
+        assert_eq!(game.id.as_deref(), Some("com.example.test"));
+        assert_eq!(game.version.as_deref(), Some("1.0.0"));
+        assert_eq!(game.executable.as_deref(), Some("game.exe"));
         assert!(game.args.is_empty());
-        assert_eq!(game.runtime.unwrap(), Runtime::Windows.to_string());
-        assert_eq!(game.runtime_version.unwrap(), "10");
+        assert_eq!(game.runtime.as_deref(), Some("windows"));
+        assert_eq!(game.runtime_version.as_deref(), Some("10"));
         assert!(game.runtime_args.is_empty());
     }
 
     #[test]
     fn game_validates() {
-        let game = Game {
-            bdgm_version: Some("1.1".to_string()),
-            name: Some("test".to_string()),
-            id: Some("com.example.test".to_string()),
-            version: Some("1.0.0".to_string()),
-            executable: Some("game.exe".to_string()),
-            args: Vec::new(),
-            runtime: Some(Runtime::Windows.to_string()),
-            runtime_version: Some("10".to_string()),
-            runtime_args: Vec::new(),
-        };
+        let game = sample_game();
 
         let validated = match ValidatedGame::validate(game.clone()) {
             Ok(game) => game,

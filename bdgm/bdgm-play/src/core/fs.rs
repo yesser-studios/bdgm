@@ -71,12 +71,38 @@ fn try_lock_error(error: TryLockError) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, io::Read, io::Write, sync::mpsc, thread, time::Duration};
+    use std::{
+        fs,
+        io::Read,
+        io::Write,
+        sync::{Arc, Mutex, mpsc},
+        thread,
+        time::Duration,
+    };
 
     use tempfile::tempdir;
 
     use super::*;
-    use crate::core::{state::State, test_utils::RecordingStateHandler};
+    use crate::core::test_utils::RecordingStateHandler;
+
+    struct NotifyingStateHandler {
+        inner: RecordingStateHandler,
+        notify: Arc<Mutex<mpsc::Sender<()>>>,
+    }
+
+    impl StateHandler for NotifyingStateHandler {
+        fn change_state(&mut self, state: State) {
+            self.inner.change_state(state);
+
+            if let Ok(sender) = self.notify.lock() {
+                let _ = sender.send(());
+            }
+        }
+
+        fn revert_state(&mut self) {
+            self.inner.revert_state();
+        }
+    }
 
     #[test]
     fn open_file_preserves_existing_contents() {
@@ -135,21 +161,23 @@ mod tests {
         let expected_lock = path.with_added_extension("lock");
         let first = acquire_lock(&path, false, None).expect("acquire first lock");
 
-        let (started_tx, started_rx) = mpsc::channel();
+        let (waiting_tx, waiting_rx) = mpsc::channel();
+        let notify = Arc::new(Mutex::new(waiting_tx));
         let (finished_tx, finished_rx) = mpsc::channel();
         let thread_path = path.clone();
         let handle = thread::spawn(move || {
-            let mut state = RecordingStateHandler::new();
-            started_tx.send(()).expect("signal lock attempt");
+            let mut state = NotifyingStateHandler {
+                inner: RecordingStateHandler::new(),
+                notify,
+            };
             let lock = acquire_lock(&thread_path, true, Some(&mut state)).expect("acquire lock");
             drop(lock);
-            finished_tx.send(state).expect("send recorded state");
+            finished_tx.send(state.inner).expect("send recorded state");
         });
 
-        started_rx
+        waiting_rx
             .recv_timeout(Duration::from_secs(5))
-            .expect("waiting thread did not start");
-        thread::sleep(Duration::from_millis(100));
+            .expect("waiting thread did not block on the lock");
         drop(first);
 
         let state = finished_rx

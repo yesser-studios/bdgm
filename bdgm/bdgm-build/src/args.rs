@@ -14,3 +14,32 @@ pub(crate) struct Args {
     #[arg(long)]
     pub dvd: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_source_and_output() {
+        let args =
+            Args::try_parse_from(["bdgm-build", "disc", "game.udf"]).expect("parse valid args");
+
+        assert_eq!(args.source, PathBuf::from("disc"));
+        assert_eq!(args.output, PathBuf::from("game.udf"));
+        assert!(!args.dvd);
+    }
+
+    #[test]
+    fn parses_dvd_flag() {
+        let args = Args::try_parse_from(["bdgm-build", "--dvd", "disc", "game.udf"])
+            .expect("parse args with --dvd");
+
+        assert!(args.dvd);
+    }
+
+    #[test]
+    fn requires_source_and_output() {
+        assert!(Args::try_parse_from(["bdgm-build"]).is_err());
+        assert!(Args::try_parse_from(["bdgm-build", "disc"]).is_err());
+    }
+}

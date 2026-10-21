@@ -47,6 +47,7 @@ pub(super) fn executable_exists(game: &ValidatedGame, app_path: &PathBuf) -> boo
 mod tests {
     use std::{fs, path::Path};
 
+    use bdgm::error::ParserError;
     use tempfile::tempdir;
 
     use super::*;
@@ -97,7 +98,13 @@ mod tests {
 
         let error = validate(&extracted(root)).expect_err("manifest is invalid");
 
-        assert!(matches!(error, AppError::ValidationError(_)));
+        assert!(matches!(
+            error,
+            AppError::ValidationError(ref errors)
+                if errors
+                    .0
+                    .contains(&BDGMError::UnableToParse(ParserError::InvalidHeader))
+        ));
     }
 
     #[test]

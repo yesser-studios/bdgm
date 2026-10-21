@@ -115,7 +115,11 @@ fn installed_and_available(
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
+    use std::fs;
+    #[cfg(not(windows))]
+    use std::path::PathBuf;
+
+    use bdgm::disc::{Entry, UdfRevision};
 
     use super::*;
     use crate::core::test_utils::{RecordingStateHandler, TestEnv, extracted, manifest};
@@ -163,11 +167,17 @@ mod tests {
             ResolvedSource::Extracted(source) => assert_eq!(source.path, disc),
             ResolvedSource::Installed(_) => panic!("game should not be installed"),
         }
-        assert_eq!(state.states.len(), 1);
         assert!(matches!(
             state.states.first(),
             Some(State::Extracting(None))
         ));
+        assert!(
+            state
+                .states
+                .iter()
+                .all(|state| matches!(state, State::Extracting(None))),
+            "resolving a mounted disc should only report extraction states"
+        );
     }
 
     #[test]
@@ -200,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn mounted_disc_extracts_when_the_manifest_is_invalid() {
+    fn mounted_disc_falls_back_when_the_manifest_cannot_be_parsed() {
         let env = TestEnv::new();
         let root = env.disc_root("disc");
         TestEnv::write_manifest(&root, "not a manifest");
@@ -217,6 +227,84 @@ mod tests {
         match resolved {
             ResolvedSource::Extracted(source) => assert_eq!(source.path, root),
             ResolvedSource::Installed(_) => panic!("invalid manifest cannot be installed"),
+        }
+    }
+
+    #[test]
+    fn mounted_disc_falls_back_when_the_manifest_is_missing() {
+        let env = TestEnv::new();
+        let root = env.disc_root("disc");
+        TestEnv::write_executable(&root, "game.exe");
+        let mut state = RecordingStateHandler::new();
+
+        let resolved = resolve(
+            Source::new(root.clone(), SourceKind::MountedDisc),
+            &env.app_dirs,
+            &mut state,
+        )
+        .expect("resolve mounted disc");
+
+        match resolved {
+            ResolvedSource::Extracted(source) => assert_eq!(source.path, root),
+            ResolvedSource::Installed(_) => panic!("missing manifest cannot be installed"),
+        }
+    }
+
+    #[test]
+    fn mounted_disc_rejects_a_parseable_but_invalid_manifest() {
+        let env = TestEnv::new();
+        let root = env.disc_root("disc");
+        TestEnv::write_manifest(
+            &root,
+            "BDGM/1.1\nid=com.example.test\nversion=1.0.0\nexecutable=game.exe\nruntime=windows\n",
+        );
+        TestEnv::write_executable(&root, "game.exe");
+        let mut state = RecordingStateHandler::new();
+
+        let result = resolve(
+            Source::new(root, SourceKind::MountedDisc),
+            &env.app_dirs,
+            &mut state,
+        );
+
+        assert!(matches!(result, Err(AppError::ValidationError(_))));
+    }
+
+    #[test]
+    fn image_source_extracts_a_valid_disc() {
+        let env = TestEnv::new();
+        let disc = env.disc(&test_manifest(), "game.exe");
+        let image = env.root().join("game.udf");
+        let entry = Entry::scan_dir(&disc).expect("scan test disc");
+        entry
+            .write_udf(image.clone(), UdfRevision::V2_50)
+            .expect("write UDF image");
+
+        let mut state = RecordingStateHandler::new();
+        let resolved = resolve(
+            Source::new(image, SourceKind::Image),
+            &env.app_dirs,
+            &mut state,
+        )
+        .expect("resolve image");
+
+        match resolved {
+            ResolvedSource::Extracted(source) => {
+                assert!(source.path.join("BDGM").join("DISC.BDGM").is_file());
+                assert!(
+                    source
+                        .path
+                        .join("BDGM")
+                        .join("APP")
+                        .join("game.exe")
+                        .is_file()
+                );
+
+                let game =
+                    crate::core::validate::validate(&source).expect("validate the extracted image");
+                assert_eq!(game.id(), "com.example.test");
+            }
+            ResolvedSource::Installed(_) => panic!("game should not be installed"),
         }
     }
 

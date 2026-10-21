@@ -7,7 +7,6 @@ fn args_not_required() {
         .without("args")
         .without("runtime_args")
         .build();
-    dbg!(&manifest);
 
     assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
 }
@@ -18,11 +17,8 @@ fn args_json_array_allowed() {
         .with("args", "[\"--help\", \"--verbose\"]")
         .with("runtime_args", "[\"--help\", \"--verbose\"]")
         .build();
-    dbg!(&manifest);
 
-    let result = ValidatedGame::validate_manifest(&manifest);
-    dbg!(&result);
-    assert!(result.is_ok())
+    assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
 }
 
 #[test]
@@ -31,7 +27,6 @@ fn args_json_enforced() {
         .with("args", "--help, --verbose")
         .with("runtime_args", "--help, --verbose")
         .build();
-    dbg!(&manifest);
 
     let errs = ValidatedGame::validate_manifest(&manifest).unwrap_err().0;
     assert!(errs.iter().any(|x| matches!(x, BDGMError::ArgsInvalid(_))));
@@ -50,7 +45,6 @@ fn args_array_enforced() {
             "{\"arg1\": \"--help\", \"arg2\": \"--verbose\"}",
         )
         .build();
-    dbg!(&manifest);
 
     let errs = ValidatedGame::validate_manifest(&manifest).unwrap_err().0;
     assert!(errs.iter().any(|x| matches!(x, BDGMError::ArgsInvalid(_))));
@@ -58,4 +52,29 @@ fn args_array_enforced() {
         errs.iter()
             .any(|x| matches!(x, BDGMError::RuntimeArgsInvalid(_)))
     );
+}
+
+#[test]
+fn args_string_elements_enforced() {
+    let manifest = ManifestBuilder::valid()
+        .with("args", "[1]")
+        .with("runtime_args", "[true]")
+        .build();
+
+    let errs = ValidatedGame::validate_manifest(&manifest).unwrap_err().0;
+    assert!(errs.iter().any(|x| matches!(x, BDGMError::ArgsInvalid(_))));
+    assert!(
+        errs.iter()
+            .any(|x| matches!(x, BDGMError::RuntimeArgsInvalid(_)))
+    );
+}
+
+#[test]
+fn empty_args_arrays_allowed() {
+    let manifest = ManifestBuilder::valid()
+        .with("args", "[]")
+        .with("runtime_args", "[]")
+        .build();
+
+    assert!(ValidatedGame::validate_manifest(&manifest).is_ok())
 }

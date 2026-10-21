@@ -5,8 +5,8 @@ use bdgm::{
 };
 
 #[test]
-fn header_enforced() {
-    let manifest = ManifestBuilder::valid().build_raw();
+fn invalid_header_rejected() {
+    let manifest = "NOTBDGM/1.1\n".to_string() + &ManifestBuilder::valid().build_raw();
 
     assert_eq!(
         ValidatedGame::validate_manifest(&manifest).unwrap_err(),
@@ -15,12 +15,56 @@ fn header_enforced() {
 }
 
 #[test]
+fn missing_header_rejected() {
+    let manifest = ManifestBuilder::valid().build_raw();
+
+    assert!(
+        ValidatedGame::validate_manifest(&manifest)
+            .unwrap_err()
+            .0
+            .contains(&ParserError::InvalidHeader.into())
+    );
+}
+
+#[test]
+fn empty_manifest_rejected() {
+    assert!(
+        ValidatedGame::validate_manifest("")
+            .unwrap_err()
+            .0
+            .contains(&BDGMError::MissingHeaderVersion)
+    );
+}
+
+#[test]
+fn missing_header_version_rejected() {
+    let manifest = "BDGM/\n".to_string() + &ManifestBuilder::valid().build_raw();
+
+    assert!(
+        ValidatedGame::validate_manifest(&manifest)
+            .unwrap_err()
+            .0
+            .contains(&BDGMError::MissingHeaderVersion)
+    );
+}
+
+#[test]
+fn unsupported_header_version_rejected() {
+    let manifest = "BDGM/9.9\n".to_string() + &ManifestBuilder::valid().build_raw();
+
+    assert!(
+        ValidatedGame::validate_manifest(&manifest)
+            .unwrap_err()
+            .0
+            .contains(&BDGMError::UnsupportedHeaderVersion("9.9".to_string()))
+    );
+}
+
+#[test]
 fn spaces_before_equals_forbidden() {
     let manifest = ManifestBuilder::valid()
         .with_raw("test =should_fail")
         .build();
-
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -35,8 +79,6 @@ fn leading_trailing_whitespaces_forbidden() {
     let manifest = ManifestBuilder::valid()
         .with_raw(" test=should_fail ")
         .build();
-
-    dbg!(&manifest);
 
     let errors = ValidatedGame::validate_manifest(&manifest).unwrap_err();
     assert!(
@@ -54,7 +96,6 @@ fn leading_trailing_whitespaces_forbidden() {
 #[test]
 fn empty_value_forbidden() {
     let manifest = ManifestBuilder::valid().with_raw("test=").build();
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -67,7 +108,6 @@ fn empty_value_forbidden() {
 #[test]
 fn duplicate_keys_forbidden() {
     let manifest = ManifestBuilder::valid().with_raw("name=Game").build();
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -80,7 +120,6 @@ fn duplicate_keys_forbidden() {
 #[test]
 fn equals_in_value_allowed() {
     let manifest = ManifestBuilder::valid().with("name", "Game=1=2").build();
-    dbg!(&manifest);
 
     assert_eq!(
         "Game=1=2",
@@ -90,20 +129,25 @@ fn equals_in_value_allowed() {
 
 #[test]
 fn test_with_empty_line_valid() {
-    let manifest = ManifestBuilder::valid().with_raw("").build();
-    dbg!(&manifest);
+    let manifest = ManifestBuilder::valid()
+        .with_raw("")
+        .with_raw("unknown=should_succeed")
+        .build();
 
+    assert!(
+        manifest.contains("\n\n"),
+        "the manifest should contain an actual empty line"
+    );
     ValidatedGame::validate_manifest(&manifest)
-        .expect("Manifest with empty line could not be validated.");
+        .expect("Manifest with an empty line could not be validated.");
 }
 
 #[test]
 fn test_line_without_equals_valid() {
     let manifest = ManifestBuilder::valid().with_raw("Should succeed.").build();
-    dbg!(&manifest);
 
     ValidatedGame::validate_manifest(&manifest)
-        .expect("Manifest with line without equals could not be validated.");
+        .expect("Manifest with a line without equals could not be validated.");
 }
 
 #[test]
@@ -111,10 +155,9 @@ fn test_line_starting_hash_valid() {
     let manifest = ManifestBuilder::valid()
         .with_raw("# Should succeed.")
         .build();
-    dbg!(&manifest);
 
     ValidatedGame::validate_manifest(&manifest)
-        .expect("Manifest with comment could not be validated.");
+        .expect("Manifest with a comment could not be validated.");
 }
 
 #[test]
@@ -122,7 +165,6 @@ fn test_unknown_key_valid() {
     let manifest = ManifestBuilder::valid()
         .with("unknown", "should_succeed")
         .build();
-    dbg!(&manifest);
 
     ValidatedGame::validate_manifest(&manifest)
         .expect("Manifest with unknown key could not be validated.");
@@ -131,7 +173,6 @@ fn test_unknown_key_valid() {
 #[test]
 fn test_missing_key_enforced() {
     let manifest = ManifestBuilder::valid().without("name").build();
-    dbg!(&manifest);
 
     assert!(
         ValidatedGame::validate_manifest(&manifest)
@@ -139,4 +180,19 @@ fn test_missing_key_enforced() {
             .0
             .contains(&BDGMError::MandatoryFieldMissing("name".to_string()))
     )
+}
+
+#[test]
+fn all_mandatory_keys_enforced() {
+    for key in ["name", "id", "version", "executable", "runtime"] {
+        let manifest = ManifestBuilder::valid().without(key).build();
+        let errors = ValidatedGame::validate_manifest(&manifest).unwrap_err();
+
+        assert!(
+            errors
+                .0
+                .contains(&BDGMError::MandatoryFieldMissing(key.to_string())),
+            "removing {key} should produce a missing-field error"
+        );
+    }
 }
