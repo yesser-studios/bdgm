@@ -1,6 +1,4 @@
 pub mod args;
 pub mod cli;
 pub mod core;
-pub mod core_ass;
 pub mod gui;
-pub mod gui_ass;
