@@ -76,7 +76,7 @@ enum Status:
 - Idle(Option<(ValidatedGame, Option<i32>)>) - contains the last exited game and its exit code.
 - Starting(Arc<State>)
 - Playing(ValidatedGame, LaunchHandle)
-- Error(AppError)
+- Error(Arc<AppError>)
 
 struct AppState:
 
@@ -158,7 +158,7 @@ create_mounted_launch_request(&AppState, PathBuf) -> LaunchRequest
 
 create_raw_disc_launch_request(&AppState, char) -> LaunchRequest - converts char to path ("\\.\X:")
 
-launch(&AppState, LaunchRequest) -> Task<Message>
+launch(LaunchRequest) -> Task<Message>
 creates a new Task::stream(stream::channel) that: wraps iced::Sender in a tokio UnboundedSender + UnboundedReceiver, forwarding from the UnboundedReceiver to the iced::Sender in a tokio::spawn, creates new GuiStateHandler using that UnboundedSender,  
 launches LaunchRequest in a tokio::spawn_blocking, fires GameStarted. If an AppError arises, fires GameError and stops.  
  Then, if GameProcess, waits for game exit, converts Result<Option<ExitStatus>> to Result<Option<i32>>, and fires GameExited.
