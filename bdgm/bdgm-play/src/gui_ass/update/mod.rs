@@ -1,6 +1,6 @@
 use iced::Task;
 
-use crate::gui::{message::Message, state::AppState};
+use crate::gui_ass::{message::Message, state::AppState};
 
 mod disc;
 mod exited;
