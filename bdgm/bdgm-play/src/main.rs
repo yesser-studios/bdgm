@@ -1,4 +1,4 @@
-use bdgm_play::{args::Args, cli::app::run, gui_ass::app::run_gui};
+use bdgm_play::{args::Args, cli::app::run, gui::app::run_gui};
 use clap::Parser;
 
 fn main() -> anyhow::Result<()> {
@@ -37,23 +37,9 @@ fn main() -> anyhow::Result<()> {
                 );
                 std::process::exit(1);
             } else {
-                #[cfg(windows)]
-                let console_hidden =
-                    bdgm_play::gui_ass::console::hide_console_if_launched_without_shell();
                 match run_gui(args) {
                     Ok(_) => Ok(None),
-                    Err(e) => {
-                        eprintln!("Error while running app: {e}");
-                        // The console is gone in Explorer launches, so surface
-                        // the failure in a dialog instead of losing it.
-                        #[cfg(windows)]
-                        if console_hidden {
-                            rfd::MessageDialog::new()
-                                .set_title("bdgm-play error")
-                                .set_description(format!("Error while running app: {e}"))
-                                .set_level(rfd::MessageLevel::Error)
-                                .show();
-                        }
+                    Err(_) => {
                         std::process::exit(1);
                     }
                 }
