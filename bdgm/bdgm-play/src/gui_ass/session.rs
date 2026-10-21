@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use iced::Task;
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
 use super::{
     message::Message,

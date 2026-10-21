@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use iced::Task;
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
 use super::super::{
     args_resolve::resolve_image,

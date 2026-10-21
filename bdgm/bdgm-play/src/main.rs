@@ -1,7 +1,4 @@
-use bdgm_play::{
-    cli::{app::run, args::Args},
-    gui_ass::app::run_gui,
-};
+use bdgm_play::{args::Args, cli::app::run, gui_ass::app::run_gui};
 use clap::Parser;
 
 fn main() -> anyhow::Result<()> {

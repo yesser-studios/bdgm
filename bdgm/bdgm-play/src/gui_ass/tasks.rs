@@ -3,7 +3,7 @@ use platform_dirs::AppDirs;
 use tempfile::TempDir;
 
 use crate::{
-    cli::args::Args,
+    args::Args,
     core_ass::{
         dirs::GameDirs,
         image::resolve_image_args_with_progress,
