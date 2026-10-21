@@ -43,8 +43,11 @@ pub enum InstallError {
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
-    #[error("Runtime {} was not found, is it installed?", .0.display())]
-    RuntimeNotFound(PathBuf),
+    #[error("Runtime {}{} was not found, is it installed?",
+       .0.runtime().display_name(),
+       .0.runtime_version().map(|v| format!(" {v}")).unwrap_or_default()
+    )]
+    RuntimeNotFound(bdgm::game::ValidatedGame, PathBuf),
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error("Port {0} is already in use")]
@@ -73,9 +76,17 @@ mod tests {
             AppError::NoAppDirs.to_string(),
             "Failed to parse app directories"
         );
+        let manifest = bdgm::manifest_builder::ManifestBuilder::valid()
+            .with("runtime", "java")
+            .with("runtime_version", "17")
+            .build();
+        let java = bdgm::game::ValidatedGame::validate_manifest(&manifest)
+            .expect("test manifest should be valid");
+
         assert_eq!(
-            AppError::LaunchError(LaunchError::RuntimeNotFound(PathBuf::from("java"))).to_string(),
-            "Runtime java was not found, is it installed?"
+            AppError::LaunchError(LaunchError::RuntimeNotFound(java, PathBuf::from("java")))
+                .to_string(),
+            "Runtime Java 17 was not found, is it installed?"
         );
         assert_eq!(
             AppError::LaunchError(LaunchError::PortTaken(1234)).to_string(),

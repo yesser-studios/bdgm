@@ -1,7 +1,3 @@
-#![allow(dead_code)]
-
-use bdgm::game::ValidatedGame;
-
 pub struct ManifestBuilder(Vec<String>);
 
 impl ManifestBuilder {
@@ -65,8 +61,9 @@ impl ManifestBuilder {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{game::ValidatedGame, manifest_builder::ManifestBuilder};
 
     #[test]
     fn valid_manifest_builder_is_valid() {

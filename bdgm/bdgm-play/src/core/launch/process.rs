@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use bdgm::runtime::Runtime;
+use bdgm::{game::ValidatedGame, runtime::Runtime};
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::core::{
@@ -166,7 +166,7 @@ fn build_bin_command(
 
 pub(super) fn run_command(
     mut command: tokio::process::Command,
-    runtime: &Runtime,
+    game: &ValidatedGame,
 ) -> Result<LaunchHandle> {
     let program = PathBuf::from(command.as_std().get_program());
 
@@ -175,10 +175,10 @@ pub(super) fn run_command(
             AsyncMutex::new(child),
         )))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            if cfg!(windows) && matches!(runtime, Runtime::Windows) {
+            if cfg!(windows) && matches!(game.runtime(), Runtime::Windows) {
                 Err(LaunchError::IoError(error).into())
             } else {
-                Err(LaunchError::RuntimeNotFound(program).into())
+                Err(LaunchError::RuntimeNotFound(game.clone(), program).into())
             }
         }
         Err(error) => Err(LaunchError::IoError(error).into()),
@@ -192,6 +192,7 @@ mod tests {
         path::Path,
     };
 
+    use bdgm::manifest_builder::ManifestBuilder;
     use tempfile::tempdir;
 
     use super::*;
@@ -199,6 +200,15 @@ mod tests {
 
     fn installed(env: &TestEnv, manifest: &str) -> InstalledGame {
         env.installed(validated_game(manifest))
+    }
+
+    fn game_with(runtime: &str, executable: &str) -> ValidatedGame {
+        let manifest = ManifestBuilder::valid()
+            .with("runtime", runtime)
+            .with("executable", executable)
+            .build();
+
+        ValidatedGame::validate_manifest(&manifest).expect("test manifest should be valid")
     }
 
     fn command_args(command: &tokio::process::Command) -> Vec<OsString> {
@@ -463,11 +473,11 @@ mod tests {
         let missing = temp.path().join("missing-runtime");
         let command = tokio::process::Command::new(&missing);
 
-        let result = run_command(command, &Runtime::Java);
+        let result = run_command(command, &game_with("java", "game.jar"));
 
         assert!(matches!(
             result,
-            Err(AppError::LaunchError(LaunchError::RuntimeNotFound(path))) if path == missing
+            Err(AppError::LaunchError(LaunchError::RuntimeNotFound(_, path))) if path == missing
         ));
     }
 
@@ -478,7 +488,7 @@ mod tests {
         let missing = temp.path().join("missing.exe");
         let command = tokio::process::Command::new(&missing);
 
-        let result = run_command(command, &Runtime::Windows);
+        let result = run_command(command, &game_with("windows", "game.exe"));
 
         assert!(matches!(
             result,
@@ -492,7 +502,7 @@ mod tests {
         let mut command = tokio::process::Command::new("sh");
         command.args(["-c", "exit 7"]);
 
-        let handle = run_command(command, &Runtime::Python).expect("spawn shell");
+        let handle = run_command(command, &game_with("python", "game.py")).expect("spawn shell");
         let LaunchHandle::GameProcess(process) = handle else {
             panic!("expected a game process");
         };
@@ -512,7 +522,7 @@ mod tests {
         let mut command = tokio::process::Command::new("cmd");
         command.args(["/C", "exit", "7"]);
 
-        let handle = run_command(command, &Runtime::Python).expect("spawn cmd");
+        let handle = run_command(command, &game_with("python", "game.py")).expect("spawn cmd");
         let LaunchHandle::GameProcess(process) = handle else {
             panic!("expected a game process");
         };
@@ -532,7 +542,7 @@ mod tests {
         let mut command = tokio::process::Command::new("sh");
         command.args(["-c", "sleep 60"]);
 
-        let handle = run_command(command, &Runtime::Python).expect("spawn shell");
+        let handle = run_command(command, &game_with("python", "game.py")).expect("spawn shell");
         let LaunchHandle::GameProcess(process) = handle else {
             panic!("expected a game process");
         };
@@ -553,7 +563,7 @@ mod tests {
         let mut command = tokio::process::Command::new("ping");
         command.args(["-n", "60", "127.0.0.1"]);
 
-        let handle = run_command(command, &Runtime::Python).expect("spawn ping");
+        let handle = run_command(command, &game_with("python", "game.py")).expect("spawn ping");
         let LaunchHandle::GameProcess(process) = handle else {
             panic!("expected a game process");
         };
