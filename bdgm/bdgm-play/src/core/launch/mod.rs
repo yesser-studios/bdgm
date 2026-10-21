@@ -76,7 +76,7 @@ async fn run_game(
             create_game_dirs(&installed.game_dirs).map_err(InstallError::IoError)?;
             let command = process::build_command(installed, runtime)?;
 
-            process::run_command(command, game.runtime())
+            process::run_command(command, &game)
         }
     }
 }

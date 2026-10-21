@@ -1,4 +1,4 @@
-use crate::common::ManifestBuilder;
+use bdgm::manifest_builder::ManifestBuilder;
 use bdgm::{
     error::{BDGMErrors, IdFormatError},
     game::ValidatedGame,
