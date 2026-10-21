@@ -38,7 +38,10 @@ impl ManifestBuilder {
     }
 
     pub fn without(&mut self, key: &str) -> &mut Self {
-        self.0.retain(|l| !l.starts_with(key));
+        self.0.retain(|line| {
+            line.split_once('=')
+                .is_none_or(|(line_key, _)| line_key != key)
+        });
         self
     }
 
@@ -68,19 +71,26 @@ mod tests {
     #[test]
     fn valid_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid().build();
-        dbg!(&manifest);
         ValidatedGame::validate_manifest(&manifest).expect("Game could not be validated.");
     }
     #[test]
     fn valid_windows_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_windows_without_runtime_version().build();
-        dbg!(&manifest);
         ValidatedGame::validate_manifest(&manifest).expect("Game could not be validated.");
     }
     #[test]
     fn valid_html_manifest_builder_is_valid() {
         let manifest = ManifestBuilder::valid_html_without_runtime_version().build();
-        dbg!(&manifest);
         ValidatedGame::validate_manifest(&manifest).expect("Game could not be validated.");
+    }
+    #[test]
+    fn without_only_removes_the_exact_key() {
+        let mut builder = ManifestBuilder::valid();
+        builder.without("runtime");
+
+        let manifest = builder.build_raw();
+        assert!(!manifest.contains("runtime="));
+        assert!(manifest.contains("runtime_version=10"));
+        assert!(manifest.contains("runtime_args=[]"));
     }
 }

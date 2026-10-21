@@ -187,15 +187,35 @@ pub fn write_simple_dir(
 
 #[cfg(test)]
 mod test {
-    use hadris_udf::UdfRevision;
+    use std::{fs, path::PathBuf};
+
+    use hadris_udf::{UdfRevision, UdfVolume};
+    use tempfile::tempdir;
 
     use crate::disc::Entry;
 
     #[test]
     fn sample_dir_written() {
-        let entry = Entry::scan_dir("../../disc").unwrap();
+        let disc = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../disc");
+        let temp = tempdir().expect("create temporary directory");
+        let output = temp.path().join("result.udf");
+
+        let entry = Entry::scan_dir(&disc).expect("scan sample disc");
         entry
-            .write_udf("./result.udf".into(), UdfRevision::V2_50)
-            .unwrap();
+            .write_udf(output.clone(), UdfRevision::V2_50)
+            .expect("write sample disc");
+
+        assert!(
+            fs::metadata(&output).expect("read output metadata").len() > 0,
+            "the written image should not be empty"
+        );
+
+        let file = fs::File::open(&output).expect("open written image");
+        let volume = UdfVolume::open(file).expect("open written UDF image");
+        let root = volume.root_dir().expect("read UDF root");
+        assert!(
+            root.find("BDGM").is_some(),
+            "the written image should contain the BDGM directory"
+        );
     }
 }

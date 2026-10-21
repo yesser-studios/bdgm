@@ -389,10 +389,14 @@ mod tests {
             ),
         );
 
-        assert!(matches!(
-            build_command(&installed, None),
-            Err(AppError::Other(_))
-        ));
+        if let Err(AppError::Other(message)) = build_command(&installed, None) {
+            assert!(
+                message.contains("HTML games must be started through the HTML server"),
+                "unexpected error message: {message}"
+            );
+        } else {
+            panic!("HTML games must not produce a process command");
+        }
     }
 
     #[cfg(not(windows))]
@@ -502,6 +506,26 @@ mod tests {
         assert_eq!(status.code(), Some(7));
     }
 
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn run_command_returns_a_waitable_process_on_windows() {
+        let mut command = tokio::process::Command::new("cmd");
+        command.args(["/C", "exit", "7"]);
+
+        let handle = run_command(command, &Runtime::Python).expect("spawn cmd");
+        let LaunchHandle::GameProcess(process) = handle else {
+            panic!("expected a game process");
+        };
+
+        let status = tokio::time::timeout(Duration::from_secs(5), process.wait())
+            .await
+            .expect("wait timed out")
+            .expect("wait failed")
+            .expect("process should have an exit status");
+
+        assert_eq!(status.code(), Some(7));
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn game_process_kill_terminates_the_process() {
@@ -509,6 +533,27 @@ mod tests {
         command.args(["-c", "sleep 60"]);
 
         let handle = run_command(command, &Runtime::Python).expect("spawn shell");
+        let LaunchHandle::GameProcess(process) = handle else {
+            panic!("expected a game process");
+        };
+
+        process.kill().await;
+        let status = tokio::time::timeout(Duration::from_secs(5), process.wait())
+            .await
+            .expect("wait timed out")
+            .expect("wait failed")
+            .expect("process should have an exit status");
+
+        assert!(!status.success());
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn game_process_kill_terminates_the_process_on_windows() {
+        let mut command = tokio::process::Command::new("ping");
+        command.args(["-n", "60", "127.0.0.1"]);
+
+        let handle = run_command(command, &Runtime::Python).expect("spawn ping");
         let LaunchHandle::GameProcess(process) = handle else {
             panic!("expected a game process");
         };

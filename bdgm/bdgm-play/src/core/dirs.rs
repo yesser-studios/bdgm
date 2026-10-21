@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn disc_paths_point_inside_the_bdgm_directory() {
-        let root = Path::new("/tmp/disc");
+        let root = Path::new("disc");
 
         assert_eq!(
             get_disc_manifest_path(root),
