@@ -3,7 +3,7 @@ use iced::{
     Alignment, Color, Element,
     Length::Fill,
     Padding,
-    widget::{button, column, container, row, text},
+    widget::{ProgressBar, button, column, container, row, text},
 };
 
 use crate::{
@@ -97,7 +97,19 @@ pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
 }
 
 pub(super) fn starting_view(state: &State) -> Element<'_, Message> {
-    text(state.to_string()).size(16).into()
+    let mut component = column![text(state.to_string()).size(16)]
+        .spacing(4)
+        .align_x(Alignment::Center);
+    if let State::Extracting(Some((current, total))) = state {
+        let fraction = if *total > 0 {
+            (*current as f64 / *total as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        component = component.push(ProgressBar::new(0.0..=1.0, fraction as f32).length(350));
+    }
+
+    component.into()
 }
 
 pub(super) fn playing_view<'a>(

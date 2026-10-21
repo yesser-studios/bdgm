@@ -29,7 +29,7 @@ impl Display for State {
             State::Extracting(Some((current, total))) => {
                 write!(
                     formatter,
-                    "Extracting... {:.2}/{:.2} MiB",
+                    "Extracting... {:.2} / {:.2} MiB",
                     *current as f64 / 1024.0 / 1024.0,
                     *total as f64 / 1024.0 / 1024.0
                 )
