@@ -1,6 +1,6 @@
 use bdgm_play::{
     cli::{app::run, args::Args},
-    gui::app::run_gui,
+    gui_ass::app::run_gui,
 };
 use clap::Parser;
 
@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 #[cfg(windows)]
                 let console_hidden =
-                    bdgm_play::gui::console::hide_console_if_launched_without_shell();
+                    bdgm_play::gui_ass::console::hide_console_if_launched_without_shell();
                 match run_gui(args) {
                     Ok(_) => Ok(None),
                     Err(e) => {
