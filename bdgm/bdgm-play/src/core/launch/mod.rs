@@ -2,6 +2,8 @@ use std::{path::Path, sync::Arc};
 
 use bdgm::{game::ValidatedGame, runtime::Runtime};
 
+use crate::core::AppError;
+
 use super::{
     dirs::{create_game_dirs, get_app_dirs},
     error::{InstallError, Result},
@@ -18,24 +20,39 @@ pub use handle::LaunchHandle;
 pub use process::GameProcess;
 pub use server::HtmlServer;
 
-pub async fn launch_request(
+pub async fn launch_request<Handler>(
     request: LaunchRequest,
-    on_state: &mut dyn StateHandler,
-) -> Result<(ValidatedGame, LaunchHandle)> {
+    mut on_state: Handler,
+) -> Result<(ValidatedGame, LaunchHandle)>
+where
+    Handler: StateHandler + Send + 'static,
+{
     let LaunchRequest { source, runtime } = request;
     let app_dirs = Arc::new(get_app_dirs()?);
-    let resolved = resolve(source, &app_dirs, on_state)?;
 
-    let installed = match resolved {
-        ResolvedSource::Extracted(source) => {
-            let validated = source.validate(on_state)?;
-            validated.install(&app_dirs, on_state)?
+    let (result, mut on_state) = tokio::task::spawn_blocking({
+        let app_dirs = app_dirs.clone();
+        move || {
+            let result = (|| -> Result<InstalledGame> {
+                let resolved = resolve(source, &app_dirs, &mut on_state)?;
+
+                match resolved {
+                    ResolvedSource::Extracted(source) => {
+                        let validated = source.validate(&mut on_state)?;
+                        validated.install(&app_dirs, &mut on_state)
+                    }
+                    ResolvedSource::Installed(installed) => Ok(installed),
+                }
+            })();
+            (result, on_state)
         }
-        ResolvedSource::Installed(installed) => installed,
-    };
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?;
 
+    let installed = result?;
     let game = installed.game.clone();
-    let handle = run_game(&installed, runtime.as_deref(), on_state).await?;
+    let handle = run_game(&installed, runtime.as_deref(), &mut on_state).await?;
 
     Ok((game, handle))
 }
