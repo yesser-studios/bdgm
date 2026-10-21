@@ -57,25 +57,27 @@ pub(super) fn launch(request: LaunchRequest) -> Task<Message> {
 
             let mut state_handler = GuiStateHandler::new(sender);
 
-            match launch_request(request, &mut state_handler).await {
-                Ok((game, handle)) => {
-                    let _ = output
-                        .send(Message::GameStarted(game.clone(), handle.clone()))
-                        .await;
+            tokio::spawn(async move {
+                match launch_request(request, &mut state_handler).await {
+                    Ok((game, handle)) => {
+                        let _ = output
+                            .send(Message::GameStarted(game.clone(), handle.clone()))
+                            .await;
 
-                    if let LaunchHandle::GameProcess(process) = handle {
-                        let exit_code = process
-                            .wait()
-                            .await
-                            .map(|status| status.and_then(|status| status.code()));
+                        if let LaunchHandle::GameProcess(process) = handle {
+                            let exit_code = process
+                                .wait()
+                                .await
+                                .map(|status| status.and_then(|status| status.code()));
 
-                        let _ = output.send(Message::GameExited(game, exit_code)).await;
+                            let _ = output.send(Message::GameExited(game, exit_code)).await;
+                        }
+                    }
+                    Err(error) => {
+                        let _ = output.send(Message::GameError(error)).await;
                     }
                 }
-                Err(error) => {
-                    let _ = output.send(Message::GameError(error)).await;
-                }
-            }
+            });
         },
     ))
 }
