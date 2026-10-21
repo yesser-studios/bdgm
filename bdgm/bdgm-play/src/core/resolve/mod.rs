@@ -42,7 +42,7 @@ fn resolve_image(
 
     if let Ok(Some(game)) = udf::get_udf_manifest(&udf) {
         let game = ValidatedGame::validate(game).map_err(AppError::ValidationError)?;
-        if let Some(installed) = installed_if_available(game, app_dirs, on_state)? {
+        if let Some(installed) = installed_and_available(game, app_dirs, on_state)? {
             return Ok(installed);
         }
     }
@@ -68,7 +68,7 @@ fn resolve_raw_disc(
 
         if let Ok(Some(game)) = udf::get_udf_manifest(&udf) {
             let game = ValidatedGame::validate(game).map_err(AppError::ValidationError)?;
-            if let Some(installed) = installed_if_available(game, app_dirs, on_state)? {
+            if let Some(installed) = installed_and_available(game, app_dirs, on_state)? {
                 return Ok(installed);
             }
         }
@@ -90,7 +90,7 @@ fn resolve_mounted(
 ) -> Result<ResolvedSource> {
     if let Some(game) = mounted::get_mounted_manifest(path)? {
         let game = ValidatedGame::validate(game).map_err(AppError::ValidationError)?;
-        if let Some(installed) = installed_if_available(game, app_dirs, on_state)? {
+        if let Some(installed) = installed_and_available(game, app_dirs, on_state)? {
             return Ok(installed);
         }
     }
@@ -101,7 +101,7 @@ fn resolve_mounted(
     }))
 }
 
-fn installed_if_available(
+fn installed_and_available(
     game: ValidatedGame,
     app_dirs: &AppDirs,
     on_state: &mut dyn StateHandler,
