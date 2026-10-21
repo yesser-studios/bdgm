@@ -2,10 +2,14 @@ use bdgm::game::ValidatedGame;
 use iced::{
     Alignment, Color, Element,
     Length::Fill,
+    Padding,
     widget::{button, column, container, row, text},
 };
 
-use crate::core::{AppError, LaunchHandle, State};
+use crate::{
+    core::{AppError, LaunchHandle, State},
+    gui::view::widgets::centered_button_text,
+};
 
 use super::{
     message::Message,
@@ -14,6 +18,8 @@ use super::{
 
 #[cfg(windows)]
 pub(super) mod raw_disc;
+
+mod widgets;
 
 pub(super) fn view(state: &AppState) -> Element<'_, Message> {
     if state.disc_picker_discs.is_some() {
@@ -37,11 +43,11 @@ pub(super) fn view(state: &AppState) -> Element<'_, Message> {
 
 pub(super) fn main_view(state: &AppState) -> Element<'_, Message> {
     let buttons = row![
-        button(text("Open Disc").size(20))
+        button(centered_button_text("Open Disc"))
             .width(150)
             .height(50)
             .on_press(Message::OpenDiscClicked),
-        button(text("Open Image").size(20))
+        button(centered_button_text("Open Image"))
             .width(150)
             .height(50)
             .on_press(Message::OpenImageClicked),
@@ -69,8 +75,9 @@ pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
         if let Some(discs) = &state.disc_picker_discs {
             for disc in discs {
                 content = content.push(
-                    button(text(format!("Drive {disc}:")).size(18))
+                    button(centered_button_text(format!("Drive {disc}:")))
                         .width(150)
+                        .height(50)
                         .on_press(Message::RunRawDisc(*disc)),
                 );
             }
@@ -79,7 +86,12 @@ pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
         content = content.push(text("Raw disc is only supported on Windows"));
     }
 
-    content = content.push(button("Cancel").on_press(Message::DiscPickerCancel));
+    content = content.push(
+        button(centered_button_text("Cancel"))
+            .width(150)
+            .height(50)
+            .on_press(Message::DiscPickerCancel),
+    );
 
     centered(content)
 }
@@ -104,11 +116,23 @@ pub(super) fn playing_view<'a>(
     .spacing(4)
     .align_x(Alignment::Center);
 
-    let mut buttons = row![button("Stop").on_press(Message::StopGameClicked)].spacing(10);
+    let mut buttons = row![
+        button(centered_button_text("Stop"))
+            .width(150)
+            .height(50)
+            .on_press(Message::StopGameClicked)
+    ]
+    .spacing(10)
+    .padding(Padding::new(0.0).top(10));
 
     if let LaunchHandle::HtmlServer(server) = handle {
         content = content.push(text(format!("Serving at {}", server.get_url())).size(14));
-        buttons = buttons.push(button("Open").on_press(Message::OpenHTMLGameClicked));
+        buttons = buttons.push(
+            button(centered_button_text("Open"))
+                .width(150)
+                .height(50)
+                .on_press(Message::OpenHTMLGameClicked),
+        );
     }
 
     content = content.push(buttons);
@@ -124,7 +148,7 @@ pub(super) fn error_view(error: &AppError) -> Element<'_, Message> {
 
 fn exit_message(game: &ValidatedGame, exit_code: &Option<i32>) -> String {
     match exit_code {
-        Some(code) if *code != 0 => format!("{} exited with code {code}", game.name()),
+        Some(code) if *code != 0 => format!("{}text exited with code {code}", game.name()),
         _ => format!("{} exited", game.name()),
     }
 }
