@@ -1,11 +1,13 @@
-use std::{path::PathBuf, process::ExitStatus, time::Duration};
+use std::{path::PathBuf, process::ExitStatus};
 
 use bdgm::runtime::Runtime;
 
 use crate::{
     args::Args,
     cli::state::CliStateHandler,
-    core::{AppError, LaunchError, LaunchRequest, Source, SourceKind, launch_request},
+    core::{
+        AppError, LaunchError, LaunchHandle, LaunchRequest, Source, SourceKind, launch_request,
+    },
 };
 
 pub async fn run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitStatus>, AppError> {
@@ -45,26 +47,21 @@ async fn try_run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitS
         game.id()
     );
 
-    match handle {
-        crate::core::LaunchHandle::GameProcess(game_process) => {
-            let status = game_process.wait().await?;
-            if let Some(status) = status {
-                if let Some(code) = status.code()
-                    && code != 0
-                {
-                    eprintln!("{} exited with code {code}!", game.name());
-                } else if status.code().is_none() {
-                    eprintln!("{} exited with no code.", game.name());
-                }
-            }
-            Ok(status)
-        }
-        crate::core::LaunchHandle::HtmlServer(server) => {
-            println!("Server running at {}", server.get_url());
-            println!("Press Ctrl-C to stop.");
-            loop {
-                tokio::time::sleep(Duration::from_hours(24)).await
-            }
+    if let LaunchHandle::HtmlServer(server) = &handle {
+        println!("Server running at {}", server.get_url());
+        println!("Press Ctrl-C to stop.");
+    }
+
+    let status = handle.wait().await?;
+    if let Some(status) = status {
+        if let Some(code) = status.code()
+            && code != 0
+        {
+            eprintln!("{} exited with code {code}!", game.name());
+        } else if status.code().is_none() {
+            eprintln!("{} exited with no code.", game.name());
         }
     }
+
+    Ok(status)
 }

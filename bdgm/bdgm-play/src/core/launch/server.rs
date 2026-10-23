@@ -8,12 +8,12 @@ use axum::Router;
 use bimap::BiMap;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use platform_dirs::AppDirs;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::Mutex as AsyncMutex};
 use tower_http::services::ServeDir;
 
 use crate::core::{
     dirs::{GameDirs, get_app_dirs},
-    error::{AppError, LaunchError, Result},
+    error::{AppError, LaunchError, Result, RunningError},
     fs::{acquire_lock, open_file, open_part_file, truncate},
     state::StateHandler,
 };
@@ -25,7 +25,7 @@ pub struct HtmlServer {
     entry_point: String,
     url: String,
     abort: tokio::task::AbortHandle,
-    task: tokio::task::JoinHandle<Result<()>>,
+    task: AsyncMutex<Option<tokio::task::JoinHandle<Result<()>>>>,
 }
 
 impl HtmlServer {
@@ -62,7 +62,7 @@ impl HtmlServer {
             entry_point,
             url,
             abort,
-            task,
+            task: AsyncMutex::new(Some(task)),
         })
     }
 
@@ -78,8 +78,20 @@ impl HtmlServer {
         self.abort.abort();
     }
 
-    pub async fn wait(self) -> Option<Result<()>> {
-        self.task.await.ok()
+    /// Waits for the server to stop, either because it was killed or because it
+    /// failed. Only the first caller observes the result; later calls return
+    /// immediately.
+    pub async fn wait(&self) -> Result<()> {
+        let Some(task) = self.task.lock().await.take() else {
+            return Ok(());
+        };
+
+        match task.await {
+            Ok(result) => result,
+            // Killing the server is the normal way to stop it.
+            Err(error) if error.is_cancelled() => Ok(()),
+            Err(error) => Err(RunningError::IoError(io::Error::other(error)).into()),
+        }
     }
 }
 
@@ -194,6 +206,7 @@ mod tests {
     use std::{
         io::{Read, Write},
         net::TcpStream,
+        sync::Arc,
         time::Duration,
     };
 
@@ -346,5 +359,34 @@ mod tests {
         assert!(server.get_url().ends_with("/dir/game%20file.html"));
 
         server.kill();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn html_server_wait_resolves_after_kill() {
+        let temp = tempdir().expect("create temporary directory");
+        let server = Arc::new(
+            HtmlServer::start(temp.path(), 0)
+                .await
+                .expect("start HTML server"),
+        );
+
+        let waiter = tokio::spawn({
+            let server = Arc::clone(&server);
+            async move { server.wait().await }
+        });
+
+        server.kill();
+
+        tokio::time::timeout(Duration::from_secs(5), waiter)
+            .await
+            .expect("wait timed out")
+            .expect("wait task panicked")
+            .expect("wait failed");
+
+        // A second waiter does not hang once the server has stopped.
+        tokio::time::timeout(Duration::from_secs(5), server.wait())
+            .await
+            .expect("repeated wait timed out")
+            .expect("repeated wait failed");
     }
 }

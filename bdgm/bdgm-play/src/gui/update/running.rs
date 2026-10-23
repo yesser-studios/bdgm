@@ -28,15 +28,10 @@ pub(super) fn on_open_html_game_clicked(state: &AppState) -> Task<Message> {
 }
 
 pub(super) fn on_stop_game_clicked(state: &mut AppState) -> Task<Message> {
-    let (game, handle) = match &state.status {
-        Status::Playing(game, handle) => (game.clone(), handle.clone()),
+    let handle = match &state.status {
+        Status::Playing(_, handle) => handle.clone(),
         _ => return Task::none(),
     };
-
-    // HTML servers have no waiter to report the exit, so leave Playing here.
-    if matches!(handle, LaunchHandle::HtmlServer(_)) {
-        state.status = Status::Idle(Some((game, None)));
-    }
 
     Task::perform(async move { handle.kill().await }, |_| Message::None)
 }
