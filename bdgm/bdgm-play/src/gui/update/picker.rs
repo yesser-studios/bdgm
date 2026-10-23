@@ -32,6 +32,7 @@ fn open_mounted_disc_picker() -> Task<Message> {
         async {
             AsyncFileDialog::new()
                 .set_title("Select mounted BDGM disc")
+                .set_directory("~")
                 .pick_folder()
                 .await
                 .map(|folder| folder.path().to_path_buf())
@@ -48,6 +49,7 @@ fn open_image_picker() -> Task<Message> {
         async {
             AsyncFileDialog::new()
                 .set_title("Select BDGM image")
+                .set_directory("~")
                 .add_filter("BDGM Image File", &["bin", "udf", "iso"])
                 .pick_file()
                 .await
