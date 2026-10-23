@@ -3,7 +3,7 @@ use iced::{
     Alignment, Color, Element,
     Length::Fill,
     Padding,
-    widget::{ProgressBar, button, column, container, row, text},
+    widget::{Column, ProgressBar, button, column, container, row, text},
 };
 
 use crate::{
@@ -30,8 +30,8 @@ pub(super) fn view(state: &AppState) -> Element<'_, Message> {
         Status::Idle(_) | Status::Error(_) => {
             let content = main_view(state);
             let content: Element<'_, Message> = match &state.status {
-                Status::Error(error) => column![content, error_view(error)].spacing(10).into(),
-                _ => content,
+                Status::Error(error) => content.push(error_view(error)).into(),
+                _ => content.into(),
             };
 
             centered(content)
@@ -41,7 +41,7 @@ pub(super) fn view(state: &AppState) -> Element<'_, Message> {
     }
 }
 
-pub(super) fn main_view(state: &AppState) -> Element<'_, Message> {
+pub(super) fn main_view(state: &AppState) -> Column<'_, Message> {
     let buttons = row![
         button(centered_button_text("Open Disc"))
             .width(150)
@@ -60,7 +60,7 @@ pub(super) fn main_view(state: &AppState) -> Element<'_, Message> {
         content = content.push(text(exit_message(game, exit_code)).size(14));
     }
 
-    content.into()
+    content
 }
 
 pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
