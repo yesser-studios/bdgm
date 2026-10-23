@@ -3,7 +3,7 @@ use std::sync::Arc;
 use iced::Task;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::core::{AppError, State, StateHandler};
+use crate::core::{State, StateHandler};
 
 use super::super::{
     message::Message,
@@ -52,10 +52,7 @@ pub(super) fn on_state_changed(state: &mut AppState, new_state: Arc<State>) -> T
     }
 
     let starting = Arc::clone(&new_state);
-    state.status = match new_state.as_ref() {
-        State::Error(error) => Status::Error(Arc::new(AppError::Other(error.to_string()))),
-        _ => Status::Starting(starting),
-    };
+    state.status = Status::Starting(starting);
 
     Task::none()
 }

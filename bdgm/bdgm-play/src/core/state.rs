@@ -2,8 +2,6 @@ use std::{fmt::Display, path::PathBuf};
 
 use bdgm::game::ValidatedGame;
 
-use super::error::AppError;
-
 pub trait StateHandler: Send + Sync {
     fn change_state(&mut self, state: State);
 
@@ -18,7 +16,6 @@ pub enum State {
     Installing(ValidatedGame),
     Launching(ValidatedGame),
     WaitingForLock(PathBuf),
-    Error(AppError),
 }
 
 impl Display for State {
@@ -45,7 +42,6 @@ impl Display for State {
             State::WaitingForLock(path) => {
                 write!(formatter, "Waiting for lock on {}...", path.display())
             }
-            State::Error(error) => write!(formatter, "{error}"),
         }
     }
 }
@@ -90,10 +86,6 @@ mod tests {
         assert_eq!(
             State::WaitingForLock(PathBuf::from("game.lock")).to_string(),
             "Waiting for lock on game.lock..."
-        );
-        assert_eq!(
-            State::Error(AppError::Other("oops".to_string())).to_string(),
-            "oops"
         );
     }
 }
