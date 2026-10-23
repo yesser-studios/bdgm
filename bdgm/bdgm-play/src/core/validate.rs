@@ -15,8 +15,8 @@ pub(super) fn validate(source: &ExtractedSource) -> Result<ValidatedGame> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return Err(AppError::ValidationError(BDGMError::DiscFileMissing.into()));
         }
-        Err(_) => {
-            return Err(AppError::ValidationError(BDGMError::DiscFileInvalid.into()));
+        Err(e) => {
+            return Err(AppError::IoError(e));
         }
     };
 
