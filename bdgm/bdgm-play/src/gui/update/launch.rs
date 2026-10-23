@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use iced::Task;
 use tokio::sync::mpsc::unbounded_channel;
 
-use crate::core::{LaunchHandle, LaunchRequest, Source, SourceKind, State, launch_request};
+use crate::core::{LaunchRequest, Source, SourceKind, State, launch_request};
 
 use super::super::{
     message::Message,
@@ -64,14 +64,12 @@ pub(super) fn launch(request: LaunchRequest) -> Task<Message> {
                             .send(Message::GameStarted(game.clone(), handle.clone()))
                             .await;
 
-                        if let LaunchHandle::GameProcess(process) = handle {
-                            let exit_code = process
-                                .wait()
-                                .await
-                                .map(|status| status.and_then(|status| status.code()));
+                        let exit_code = handle
+                            .wait()
+                            .await
+                            .map(|status| status.and_then(|status| status.code()));
 
-                            let _ = output.send(Message::GameExited(game, exit_code)).await;
-                        }
+                        let _ = output.send(Message::GameExited(game, exit_code)).await;
                     }
                     Err(error) => {
                         let _ = output.send(Message::GameError(error)).await;

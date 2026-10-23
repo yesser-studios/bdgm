@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use std::{process::ExitStatus, sync::Arc};
+
+use crate::core::Result;
 
 use super::{process::GameProcess, server::HtmlServer};
 
@@ -13,6 +15,14 @@ impl LaunchHandle {
         match self {
             LaunchHandle::GameProcess(process) => process.kill().await,
             LaunchHandle::HtmlServer(server) => server.kill(),
+        }
+    }
+
+    /// Waits for the launched game to stop. HTML servers have no exit code.
+    pub async fn wait(self) -> Result<Option<ExitStatus>> {
+        match self {
+            LaunchHandle::GameProcess(process) => process.wait().await,
+            LaunchHandle::HtmlServer(server) => server.wait().await.map(|()| None),
         }
     }
 }
