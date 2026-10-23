@@ -160,7 +160,7 @@ pub(super) fn error_view(error: &AppError) -> Element<'_, Message> {
 
 fn exit_message(game: &ValidatedGame, exit_code: &Option<i32>) -> String {
     match exit_code {
-        Some(code) if *code != 0 => format!("{}text exited with code {code}", game.name()),
+        Some(code) if *code != 0 => format!("{} exited with code {code}", game.name()),
         _ => format!("{} exited", game.name()),
     }
 }
