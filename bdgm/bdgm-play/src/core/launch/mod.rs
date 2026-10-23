@@ -7,6 +7,7 @@ use crate::core::AppError;
 use super::{
     dirs::{create_game_dirs, get_app_dirs},
     error::{InstallError, Result},
+    migrate::migrate_dirs,
     request::{InstalledGame, LaunchRequest, ResolvedSource},
     resolve::resolve,
     state::{State, StateHandler},
@@ -33,6 +34,15 @@ where
     let (result, mut on_state) = tokio::task::spawn_blocking({
         let app_dirs = app_dirs.clone();
         move || {
+            if let Err(error) = migrate_dirs(&app_dirs) {
+                eprintln!("An error occurred while migrating game data: {error}");
+                eprintln!(
+                    "Some game data may not have been migrated. Check {} and {} for remaining game data directories.",
+                    app_dirs.data_dir.display(),
+                    app_dirs.cache_dir.display()
+                );
+            }
+
             let result = (|| -> Result<InstalledGame> {
                 let resolved = resolve(source, &app_dirs, &mut on_state)?;
 

@@ -353,6 +353,14 @@ get_app_dirs() -> Result<AppDirs> - gets app dir paths (maps None to NoAppDirs e
 
 create_game_dirs(&GameDirs) -> io::Result<()> - creates game data, cache and parent of install_dir specified in the tree under dirs if they don't exist.
 
+### migrate
+
+Migrates game directories written by older versions to the current tree.
+
+migrate_dirs(&AppDirs) -> io::Result<()> - for both `data_dir` and `cache_dir`, moves every legacy `<parent>/<game_id>` to `<parent>/games/<game_id>`.  
+  Files (such as `ports.json`) and the `games` directory itself are ignored, existing destinations are skipped, and a missing `<parent>` is a no-op.  
+  The first error is returned. Called from `launch_request`; failures are eprintln!ed and do not prevent launching the game.
+
 ### fs
 
 Helpers for manipulating files and directories.
