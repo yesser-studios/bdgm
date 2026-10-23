@@ -3,6 +3,7 @@ mod error;
 mod fs;
 mod install;
 mod launch;
+mod migrate;
 mod request;
 mod resolve;
 mod state;
