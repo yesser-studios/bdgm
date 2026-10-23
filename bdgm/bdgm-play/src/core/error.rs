@@ -90,7 +90,7 @@ mod tests {
                 PathBuf::from("java")
             ))
             .to_string(),
-            "Runtime Java 17 was not found, is it installed?"
+            "Runtime Java 17 (path: `java`) was not found, is it installed?"
         );
         assert_eq!(
             AppError::LaunchError(LaunchError::PortTaken(1234)).to_string(),
