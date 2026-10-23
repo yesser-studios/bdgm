@@ -25,6 +25,7 @@ pub struct HtmlServer {
     entry_point: String,
     url: String,
     abort: tokio::task::AbortHandle,
+    task: tokio::task::JoinHandle<Result<()>>,
 }
 
 impl HtmlServer {
@@ -61,6 +62,7 @@ impl HtmlServer {
             entry_point,
             url,
             abort,
+            task,
         })
     }
 
@@ -74,6 +76,10 @@ impl HtmlServer {
 
     pub fn kill(&self) {
         self.abort.abort();
+    }
+
+    pub async fn wait(self) -> Option<Result<()>> {
+        self.task.await.ok()
     }
 }
 
