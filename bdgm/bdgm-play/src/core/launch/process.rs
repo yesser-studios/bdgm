@@ -128,7 +128,7 @@ fn get_envvars(installed: &InstalledGame) -> HashMap<&'static str, String> {
     );
     envvars.insert("BDGM_VERSION", installed.game.bdgm_version().to_string());
 
-    if matches!(installed.game.runtime(), Runtime::Windows) {
+    if cfg!(not(windows)) && matches!(installed.game.runtime(), Runtime::Windows) {
         envvars.insert(
             "WINEPREFIX",
             game_dirs
