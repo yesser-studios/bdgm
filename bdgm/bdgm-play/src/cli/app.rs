@@ -29,6 +29,12 @@ pub async fn run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitS
     match handle {
         crate::core::LaunchHandle::GameProcess(game_process) => {
             let status = game_process.wait().await?;
+            if let Some(status) = status
+                && let Some(code) = status.code()
+                && code != 0
+            {
+                eprintln!("{} exited with code {code}!", game.name())
+            }
             Ok(status)
         }
         crate::core::LaunchHandle::HtmlServer(server) => {
