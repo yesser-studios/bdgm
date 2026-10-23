@@ -168,8 +168,6 @@ pub(super) fn run_command(
     mut command: tokio::process::Command,
     game: &ValidatedGame,
 ) -> Result<LaunchHandle> {
-    let program = PathBuf::from(command.as_std().get_program());
-
     match command.kill_on_drop(true).spawn() {
         Ok(child) => Ok(LaunchHandle::GameProcess(GameProcess(Arc::new(
             AsyncMutex::new(child),
@@ -178,7 +176,8 @@ pub(super) fn run_command(
             if cfg!(windows) && matches!(game.runtime(), Runtime::Windows) {
                 Err(LaunchError::IoError(error).into())
             } else {
-                Err(LaunchError::RuntimeNotFound(game.clone(), program).into())
+                let program = PathBuf::from(command.as_std().get_program());
+                Err(LaunchError::RuntimeNotFound(Box::new(game.clone()), program).into())
             }
         }
         Err(error) => Err(LaunchError::IoError(error).into()),

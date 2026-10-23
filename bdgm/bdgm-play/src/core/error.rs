@@ -43,11 +43,12 @@ pub enum InstallError {
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
-    #[error("Runtime {}{} was not found, is it installed?",
+    #[error("Runtime {}{} (path: `{}`) was not found, is it installed?",
        .0.runtime().display_name(),
-       .0.runtime_version().map(|v| format!(" {v}")).unwrap_or_default()
+       .0.runtime_version().map(|v| format!(" {v}")).unwrap_or_default(),
+       .1.display()
     )]
-    RuntimeNotFound(bdgm::game::ValidatedGame, PathBuf),
+    RuntimeNotFound(Box<bdgm::game::ValidatedGame>, PathBuf),
     #[error(transparent)]
     IoError(#[from] io::Error),
     #[error("Port {0} is already in use")]
@@ -84,8 +85,11 @@ mod tests {
             .expect("test manifest should be valid");
 
         assert_eq!(
-            AppError::LaunchError(LaunchError::RuntimeNotFound(java, PathBuf::from("java")))
-                .to_string(),
+            AppError::LaunchError(LaunchError::RuntimeNotFound(
+                Box::new(java),
+                PathBuf::from("java")
+            ))
+            .to_string(),
             "Runtime Java 17 was not found, is it installed?"
         );
         assert_eq!(
