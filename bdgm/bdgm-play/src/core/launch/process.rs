@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn envvars_include_spec_paths_and_a_wine_prefix_for_windows_games() {
+    fn envvars_include_spec_paths_and_a_wine_prefix_for_windows_games_on_not_windows_platforms() {
         let env = TestEnv::new();
         let installed = installed(
             &env,
@@ -252,10 +252,12 @@ mod tests {
             Some(app.to_string_lossy().as_ref())
         );
         assert_eq!(envvars.get("BDGM_VERSION").map(String::as_str), Some("1.1"));
-        assert_eq!(
-            envvars.get("WINEPREFIX").map(String::as_str),
-            Some(wineprefix.to_string_lossy().as_ref())
-        );
+        if cfg!(not(windows)) {
+            assert_eq!(
+                envvars.get("WINEPREFIX").map(String::as_str),
+                Some(wineprefix.to_string_lossy().as_ref())
+            );
+        }
         assert!(data.is_absolute());
         assert!(cache.is_absolute());
         assert!(app.is_absolute());
