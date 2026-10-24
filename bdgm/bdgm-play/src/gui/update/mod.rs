@@ -7,6 +7,7 @@ mod picker;
 mod running;
 mod state;
 
+/// Applies a GUI message and returns any picker, launch, or termination task it starts.
 pub(super) fn update(state: &mut AppState, message: Message) -> Task<Message> {
     match message {
         Message::OpenDiscClicked => picker::on_open_disc_clicked(state),

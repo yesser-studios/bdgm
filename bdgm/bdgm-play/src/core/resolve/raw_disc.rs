@@ -27,12 +27,19 @@ pub(super) struct RawDiscReader {
 }
 
 impl RawDiscReader {
+    /// Opens a raw device and reads its capacity, requiring 2,048-byte sectors.
+    ///
+    /// Device opening and capacity query failures return extraction I/O errors;
+    /// an unexpected sector size returns an extraction I/O error of kind `InvalidData`.
     pub(super) fn open(path: &Path) -> Result<Self> {
         let file = File::open(path).map_err(ExtractError::IoError)?;
         let reader = Self::try_from(file).map_err(ExtractError::IoError)?;
         Ok(reader)
     }
 
+    /// Loads one 2,048-byte sector unless it is already cached.
+    ///
+    /// Propagates seek or complete-sector read errors.
     fn fill_sector(&mut self, sector: u64) -> io::Result<()> {
         if self.cache_valid && self.cache_sector == sector {
             return Ok(());
@@ -66,6 +73,10 @@ impl TryFrom<File> for RawDiscReader {
 }
 
 impl Read for RawDiscReader {
+    /// Reads up to the current sector boundary and advances the byte position.
+    ///
+    /// Returns zero for an empty buffer or at or beyond disc capacity. Sector seek
+    /// and read errors propagate.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if buf.is_empty() || self.pos >= self.len {
             return Ok(0);
@@ -85,6 +96,9 @@ impl Read for RawDiscReader {
 }
 
 impl Seek for RawDiscReader {
+    /// Sets the logical byte position, allowing positions beyond the disc's end.
+    ///
+    /// Negative positions and positions exceeding `u64` return `InvalidInput`.
     fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
         let new_position = match position {
             SeekFrom::Start(offset) => i128::from(offset),
@@ -110,6 +124,9 @@ impl Seek for RawDiscReader {
     }
 }
 
+/// Queries device capacity in bytes and requires 2,048-byte sectors.
+///
+/// Returns the Windows API error on failure or `InvalidData` for another sector size.
 fn disc_size(file: &File) -> io::Result<u64> {
     let mut capacity = STORAGE_READ_CAPACITY {
         Version: std::mem::size_of::<STORAGE_READ_CAPACITY>() as u32,

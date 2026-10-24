@@ -18,6 +18,10 @@ pub struct LaunchRequest {
 }
 
 impl LaunchRequest {
+    /// Creates a launch request with an optional runtime executable override.
+    ///
+    /// `None` selects the default runtime command. The override is ignored for HTML
+    /// and for Windows games running natively on Windows; no paths are checked here.
     pub fn new(source: Source, runtime: Option<PathBuf>) -> Self {
         Self { source, runtime }
     }
@@ -29,6 +33,7 @@ pub struct Source {
 }
 
 impl Source {
+    /// Describes a disc root, image file, or raw device path without opening or validating it.
     pub fn new(path: PathBuf, kind: SourceKind) -> Self {
         Self { path, kind }
     }
@@ -52,6 +57,10 @@ pub(super) struct ExtractedSource {
 }
 
 impl ExtractedSource {
+    /// Reports validation and checks the manifest, APP directory, and executable file.
+    ///
+    /// Preserves temporary extraction storage on success. Manifest I/O and validation
+    /// errors propagate; a failed validation drops any owned temporary directory.
     pub(super) fn validate(self, on_state: &mut dyn StateHandler) -> Result<ValidatedSource> {
         on_state.change_state(State::Validating);
         let game = validate::validate(&self)?;
@@ -71,6 +80,9 @@ pub(super) struct ValidatedSource {
 }
 
 impl ValidatedSource {
+    /// Reports installation and installs or reuses the game, returning its metadata and paths.
+    ///
+    /// Propagates installation errors and releases any temporary extraction storage.
     pub(super) fn install(
         self,
         app_dirs: &AppDirs,

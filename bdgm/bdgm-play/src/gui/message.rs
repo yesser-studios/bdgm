@@ -26,6 +26,7 @@ pub(super) enum Message {
 // cloned errors are only used as terminal display text, so preserve their
 // message without preserving their concrete variant.
 impl Clone for Message {
+    /// Clones the message, converting any error to `AppError::Other` with the same display text.
     fn clone(&self) -> Self {
         match self {
             Self::OpenDiscClicked => Self::OpenDiscClicked,
@@ -47,6 +48,7 @@ impl Clone for Message {
     }
 }
 
+/// Preserves error display text in `AppError::Other`, discarding the original variant.
 fn clone_error(error: &AppError) -> AppError {
     AppError::Other(error.to_string())
 }

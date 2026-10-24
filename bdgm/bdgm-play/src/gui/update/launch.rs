@@ -11,10 +11,12 @@ use super::super::{
 };
 use super::state::GuiStateHandler;
 
+/// Builds an image request using the GUI's runtime override without opening the image.
 pub(super) fn create_image_launch_request(state: &AppState, path: PathBuf) -> LaunchRequest {
     LaunchRequest::new(Source::new(path, SourceKind::Image), state.runtime.clone())
 }
 
+/// Builds a mounted-disc request for a disc root using the GUI's runtime override.
 pub(super) fn create_mounted_launch_request(state: &AppState, path: PathBuf) -> LaunchRequest {
     LaunchRequest::new(
         Source::new(path, SourceKind::MountedDisc),
@@ -22,6 +24,7 @@ pub(super) fn create_mounted_launch_request(state: &AppState, path: PathBuf) -> 
     )
 }
 
+/// Builds a Windows device-path request from a drive letter and the GUI's runtime override.
 pub(super) fn create_raw_disc_launch_request(state: &AppState, disc: char) -> LaunchRequest {
     LaunchRequest::new(
         Source::new(
@@ -32,11 +35,16 @@ pub(super) fn create_raw_disc_launch_request(state: &AppState, disc: char) -> La
     )
 }
 
+/// Closes the disc picker and changes the GUI to its initial preparation state.
 pub(super) fn pre_launch(state: &mut AppState) {
     state.disc_picker_discs = None;
     state.status = Status::Starting(Arc::new(State::StartingExtraction));
 }
 
+/// Creates a task that launches a game and forwards preparation, start, and exit messages.
+///
+/// Launch failures become `GameError`; wait failures become failed `GameExited`
+/// results. Process exits without a code and HTML server exits both yield `None`.
 pub(super) fn launch(request: LaunchRequest) -> Task<Message> {
     Task::stream(iced::stream::channel(
         100,

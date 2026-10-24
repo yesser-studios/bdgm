@@ -21,6 +21,15 @@ pub use handle::LaunchHandle;
 pub use process::GameProcess;
 pub use server::HtmlServer;
 
+/// Resolves, validates, and installs a source as needed, then starts its game.
+///
+/// Reports preparation states through `on_state` and returns game metadata with a
+/// handle for stopping or waiting. HTML games start a loopback server and attempt
+/// to open the entry point in a browser; other games start a child process.
+///
+/// App directory, source, validation, installation, and launch errors propagate.
+/// A failed preparation task returns `AppError::Other`. Legacy directory migration
+/// and browser-opening failures do not prevent launch.
 pub async fn launch_request<Handler>(
     request: LaunchRequest,
     mut on_state: Handler,
@@ -67,6 +76,10 @@ where
     Ok((game, handle))
 }
 
+/// Reports launch and starts the installed game's HTML server or runtime process.
+///
+/// `runtime` overrides the runtime executable except for HTML and native Windows
+/// games. Propagates directory creation, server startup, and process launch errors.
 async fn run_game(
     installed: &InstalledGame,
     runtime: Option<&Path>,

@@ -1,6 +1,10 @@
 use bdgm_play::{args::Args, cli::app::run, gui::app::run_gui};
 use clap::Parser;
 
+/// Runs the CLI when a source path is supplied, otherwise opens the GUI.
+///
+/// Normalizes runtime paths while preserving bare commands for PATH lookup.
+/// CLI process exit codes become player exit codes; launch failures exit with one.
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
     args.runtime = match args.runtime.take() {

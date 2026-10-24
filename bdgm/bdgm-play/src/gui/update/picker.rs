@@ -3,6 +3,7 @@ use rfd::AsyncFileDialog;
 
 use super::super::{message::Message, state::AppState};
 
+/// Shows the drive picker on Windows, or returns a mounted-disc folder picker task elsewhere.
 pub(super) fn on_open_disc_clicked(state: &mut AppState) -> Task<Message> {
     #[cfg(not(windows))]
     let _ = state;
@@ -18,15 +19,18 @@ pub(super) fn on_open_disc_clicked(state: &mut AppState) -> Task<Message> {
     open_mounted_disc_picker()
 }
 
+/// Closes the drive picker without changing the current game status.
 pub(super) fn on_disc_picker_cancel(state: &mut AppState) -> Task<Message> {
     state.disc_picker_discs = None;
     Task::none()
 }
 
+/// Returns an image file picker task without changing the current game status.
 pub(super) fn on_open_image_clicked(_state: &mut AppState) -> Task<Message> {
     open_image_picker()
 }
 
+/// Returns a folder picker task that emits `RunMounted` on selection or `None` on cancellation.
 fn open_mounted_disc_picker() -> Task<Message> {
     Task::perform(
         async {
@@ -44,6 +48,7 @@ fn open_mounted_disc_picker() -> Task<Message> {
     )
 }
 
+/// Returns a filtered image picker task that emits `RunImage` on selection or `None` on cancellation.
 fn open_image_picker() -> Task<Message> {
     Task::perform(
         async {

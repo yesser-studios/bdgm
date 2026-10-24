@@ -10,6 +10,11 @@ use crate::{
     },
 };
 
+/// Launches the selected source and waits for its process or HTML server to stop.
+///
+/// `extracted_location` is the disc root, image, or device path selected by `args`.
+/// Returns the process status, or `None` for an HTML server. Preparation, launch,
+/// and wait errors are reported to stderr and returned to the caller.
 pub async fn run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitStatus>, AppError> {
     match try_run(args, extracted_location).await {
         Ok(status) => Ok(status),
@@ -27,6 +32,10 @@ pub async fn run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitS
     }
 }
 
+/// Selects the source kind from CLI flags, launches it, and waits for exit.
+///
+/// Returns unsuccessful process exits as statuses, not errors. Preparation,
+/// launch, and wait errors propagate; HTML server completion returns `None`.
 async fn try_run(args: Args, extracted_location: PathBuf) -> Result<Option<ExitStatus>, AppError> {
     let source = Source::new(extracted_location, {
         if !args.is_raw_disc() && !args.image {

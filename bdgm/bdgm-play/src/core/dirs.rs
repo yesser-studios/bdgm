@@ -13,6 +13,7 @@ pub(super) struct GameDirs {
 }
 
 impl GameDirs {
+    /// Derives installation and shared data paths from game metadata without creating directories.
     pub(super) fn from(game: &ValidatedGame, app_dirs: Arc<AppDirs>) -> Self {
         Self {
             app_dirs,
@@ -22,22 +23,27 @@ impl GameDirs {
         }
     }
 
+    /// Returns the game root at `<data_dir>/games/<id>`.
     pub(super) fn root(&self) -> PathBuf {
         self.app_dirs.data_dir.join("games").join(&self.id)
     }
 
+    /// Returns the version-specific installation path beneath the game root.
     pub(super) fn install_dir(&self) -> PathBuf {
         self.root().join("app").join(&self.version)
     }
 
+    /// Returns the cache path shared by all versions of this game.
     pub(super) fn cache(&self) -> PathBuf {
         self.app_dirs.cache_dir.join("games").join(&self.id)
     }
 
+    /// Returns the persistent data path shared by all versions of this game.
     pub(super) fn data(&self) -> PathBuf {
         self.root().join("data")
     }
 
+    /// Returns the manifest executable path within this version's installation.
     pub(super) fn executable(&self) -> PathBuf {
         self.install_dir().join(&self.executable)
     }
@@ -47,6 +53,7 @@ impl GameDirs {
     }
 }
 
+/// Builds an installation path from an already validated game ID and version.
 pub(super) fn get_install_dir_path(id: &str, version: &str, app_dirs: &AppDirs) -> PathBuf {
     app_dirs
         .data_dir
@@ -56,18 +63,25 @@ pub(super) fn get_install_dir_path(id: &str, version: &str, app_dirs: &AppDirs) 
         .join(version)
 }
 
+/// Returns `BDGM/DISC.BDGM` beneath the disc root without checking existence.
 pub(super) fn get_disc_manifest_path(disc_root: &Path) -> PathBuf {
     disc_root.join("BDGM").join("DISC.BDGM")
 }
 
+/// Returns `BDGM/APP` beneath the disc root without checking existence.
 pub(super) fn get_disc_app_dir_path(disc_root: &Path) -> PathBuf {
     disc_root.join("BDGM").join("APP")
 }
 
+/// Resolves platform directories for bdgm-play, returning `NoAppDirs` if unavailable.
 pub(super) fn get_app_dirs() -> Result<AppDirs> {
     AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)
 }
 
+/// Creates shared data, cache, and installation parent directories.
+///
+/// The version-specific installation directory is not created. Returns the first
+/// filesystem error; directories created before that error remain.
 pub(super) fn create_game_dirs(game_dirs: &GameDirs) -> io::Result<()> {
     fs::create_dir_all(game_dirs.data())?;
     fs::create_dir_all(game_dirs.cache())?;

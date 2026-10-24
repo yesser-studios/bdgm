@@ -12,6 +12,14 @@ use super::{
     validate::executable_exists,
 };
 
+/// Installs `BDGM/APP` for this version, or reuses it if its executable is a file.
+///
+/// Creates shared game directories and waits for the installation lock, reporting
+/// lock waits through `on_state`. Replaces an incomplete installation and stale
+/// `.part` directory before copying and renaming the new installation into place.
+///
+/// Returns `InstallError::IoError` for directory, lock, copy, or rename failures;
+/// a failure can leave a partial installation.
 pub(super) fn install(
     source: ValidatedSource,
     app_dirs: &AppDirs,
@@ -50,6 +58,10 @@ pub(super) fn install(
     Ok(game_dirs)
 }
 
+/// Checks whether the version's installation path exists after waiting for its lock.
+///
+/// Returns false if its parent is absent. This does not check for an executable.
+/// Lock file opening and locking failures return `InstallError::IoError`.
 pub(super) fn check_installed(
     id: &str,
     version: &str,

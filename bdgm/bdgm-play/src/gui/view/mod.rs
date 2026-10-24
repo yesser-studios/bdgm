@@ -21,6 +21,7 @@ pub(super) mod raw_disc;
 
 mod widgets;
 
+/// Renders the drive picker when open, otherwise the view for the current game status.
 pub(super) fn view(state: &AppState) -> Element<'_, Message> {
     if state.disc_picker_discs.is_some() {
         return disc_picker(state);
@@ -41,6 +42,7 @@ pub(super) fn view(state: &AppState) -> Element<'_, Message> {
     }
 }
 
+/// Builds source selection buttons and, when idle after a game, its exit message.
 pub(super) fn main_view(state: &AppState) -> Column<'_, Message> {
     let buttons = row![
         button(centered_button_text("Open Disc"))
@@ -63,6 +65,7 @@ pub(super) fn main_view(state: &AppState) -> Column<'_, Message> {
     content
 }
 
+/// Builds Windows drive choices or an unsupported-platform message, with a cancel button.
 pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
     #[cfg(not(windows))]
     let _ = state;
@@ -96,6 +99,9 @@ pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
     centered(content)
 }
 
+/// Displays preparation status and a progress bar when extraction byte counts are available.
+///
+/// The displayed fraction is clamped to zero through one; a zero total displays zero.
 pub(super) fn starting_view(state: &State) -> Element<'_, Message> {
     let mut component = column![text(state.to_string()).size(16)]
         .spacing(4)
@@ -112,6 +118,7 @@ pub(super) fn starting_view(state: &State) -> Element<'_, Message> {
     component.into()
 }
 
+/// Builds game details and a stop button, with a URL and reopen button for HTML games.
 pub(super) fn playing_view<'a>(
     game: &'a ValidatedGame,
     handle: &'a LaunchHandle,
@@ -151,6 +158,7 @@ pub(super) fn playing_view<'a>(
     container(content).padding(8).into()
 }
 
+/// Renders the error's display text in red.
 pub(super) fn error_view(error: &AppError) -> Element<'_, Message> {
     text(error.to_string())
         .size(14)
@@ -158,6 +166,7 @@ pub(super) fn error_view(error: &AppError) -> Element<'_, Message> {
         .into()
 }
 
+/// Formats game completion text, including the exit code only when it is nonzero.
 fn exit_message(game: &ValidatedGame, exit_code: &Option<i32>) -> String {
     match exit_code {
         Some(code) if *code != 0 => format!("{} exited with code {code}.", game.name()),
@@ -165,6 +174,7 @@ fn exit_message(game: &ValidatedGame, exit_code: &Option<i32>) -> String {
     }
 }
 
+/// Centers content horizontally and vertically within the available space.
 fn centered<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
     container(content).center_x(Fill).center_y(Fill).into()
 }
