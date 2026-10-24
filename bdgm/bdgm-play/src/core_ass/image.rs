@@ -3,25 +3,22 @@ use std::fs::File;
 use std::str::FromStr;
 
 #[cfg(windows)]
-use bdgm::game::{Game, ValidatedGame};
+use bdgm::game::ValidatedGame;
 use hadris_udf::UdfVolume;
 #[cfg(windows)]
 use platform_dirs::AppDirs;
 use tempfile::{TempDir, tempdir};
 
 use crate::{
-    cli::args::Args,
-    core::{
-        dump::extract_udf_dir,
-        error::IoError,
-    },
+    args::Args,
+    core_ass::{dump::extract_udf_dir, error::IoError},
 };
 
 #[cfg(windows)]
-use crate::core::dirs::GameDirs;
+use crate::core_ass::dirs::GameDirs;
 
 #[cfg(windows)]
-use crate::core::dump::{
+use crate::core_ass::dump::{
     dump_disc_with_progress, raw_disc_has_manifest, read_manifest_from_raw_disc,
 };
 #[cfg(windows)]
@@ -63,13 +60,9 @@ fn try_raw_disc_cache_hit(args: &Args) -> Option<anyhow::Result<(Args, Option<Te
     }
     // 2. Read just the manifest file's extents.
     let manifest = read_manifest_from_raw_disc(&drive).ok()?;
-    let game = ValidatedGame::validate(Game::from_str(&manifest).ok()?).ok()?;
+    let game = ValidatedGame::validate_manifest(&manifest).ok()?;
     let app_dirs = AppDirs::new(Some("bdgm-play"), true)?;
-    if !GameDirs::from(&game, &app_dirs)
-        .install
-        .try_exists()
-        .ok()?
-    {
+    if !GameDirs::from(&game, &app_dirs).install.try_exists().ok()? {
         return None;
     }
 

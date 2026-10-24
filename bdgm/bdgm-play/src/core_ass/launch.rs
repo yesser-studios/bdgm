@@ -6,8 +6,8 @@ use platform_dirs::AppDirs;
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::{
-    cli::args::Args,
-    core::{
+    args::Args,
+    core_ass::{
         dirs::{GameDirs, get_app_dir_path},
         error::RuntimeNotFound,
         server::play_html_game,

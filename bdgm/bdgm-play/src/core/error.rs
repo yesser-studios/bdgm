@@ -1,100 +1,131 @@
-use std::{fmt::Display, fs, io, path::Path};
+use std::{io, path::PathBuf};
 
-use bdgm::error::BDGMError;
+use bdgm::error::BDGMErrors;
 use thiserror::Error;
 
-#[derive(Debug, Error, PartialEq, Eq)]
+pub type Result<T> = std::result::Result<T, AppError>;
+
+#[derive(Debug, Error)]
 pub enum AppError {
+    #[error("Failed to parse app directories")]
     NoAppDirs,
-    InvalidGameFile(BDGMError),
-    CouldNotFindUnclaimedPort,
-}
-
-impl Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AppError::NoAppDirs => write!(f, "Failed to parse app directories"),
-            AppError::InvalidGameFile(e) => write!(f, "The disc manifest is invalid: {e}"),
-            AppError::CouldNotFindUnclaimedPort => {
-                write!(f, "Could not find a port that hasn't been claimed yet")
-            }
-        }
-    }
+    #[error(transparent)]
+    ExtractError(#[from] ExtractError),
+    #[error(transparent)]
+    ValidationError(#[from] BDGMErrors),
+    #[error(transparent)]
+    InstallError(#[from] InstallError),
+    #[error(transparent)]
+    LaunchError(#[from] LaunchError),
+    #[error(transparent)]
+    RunningError(#[from] RunningError),
+    #[error("{0} is not supported on this platform.")]
+    UnsupportedOnThisPlatform(UnsupportedOperation),
+    #[error("{0} is not supported.")]
+    UnsupportedOperation(UnsupportedOperation),
+    #[error("An IO error occured: {0}")]
+    IoError(#[from] io::Error),
+    #[error("{0}")]
+    Other(String),
 }
 
 #[derive(Debug, Error)]
-pub enum IoError {
-    IoError(io::Error),
-    TryLockError(fs::TryLockError),
-    FsExtraError(fs_extra::error::Error),
-    PathNone,
+pub enum ExtractError {
+    #[error(transparent)]
+    IoError(#[from] io::Error),
 }
 
-impl Display for IoError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IoError::IoError(error) => error.fmt(f),
-            IoError::TryLockError(error) => error.fmt(f),
-            IoError::FsExtraError(error) => error.fmt(f),
-            IoError::PathNone => write!(f, "Path is None"),
-        }
-    }
-}
-
-impl From<io::Error> for IoError {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
-}
-impl From<fs::TryLockError> for IoError {
-    fn from(value: fs::TryLockError) -> Self {
-        Self::TryLockError(value)
-    }
-}
-impl From<fs_extra::error::Error> for IoError {
-    fn from(value: fs_extra::error::Error) -> Self {
-        Self::FsExtraError(value)
-    }
-}
-
-/// Error for a missing runtime binary when spawning a game process.
-///
-/// Displays as `Runtime <display name>[ <version>] was not found, is it installed?`.
 #[derive(Debug, Error)]
-pub struct RuntimeNotFound {
-    display: String,
-    version: Option<String>,
+pub enum InstallError {
+    #[error(transparent)]
+    IoError(#[from] io::Error),
 }
 
-impl Display for RuntimeNotFound {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.version {
-            Some(version) => write!(
-                f,
-                "Runtime {} {} was not found, is it installed?",
-                self.display, version
-            ),
-            None => write!(
-                f,
-                "Runtime {} was not found, is it installed?",
-                self.display
-            ),
-        }
-    }
+#[derive(Debug, Error)]
+pub enum LaunchError {
+    #[error("Runtime {}{} (path: `{}`) was not found, is it installed?",
+       .0.runtime().display_name(),
+       .0.runtime_version().map(|v| format!(" {v}")).unwrap_or_default(),
+       .1.display()
+    )]
+    RuntimeNotFound(Box<bdgm::game::ValidatedGame>, PathBuf),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error("Port {0} is already in use")]
+    PortTaken(u16),
 }
 
-impl RuntimeNotFound {
-    pub fn from_game(game: &bdgm::game::ValidatedGame) -> Self {
-        Self {
-            display: game.runtime().display_name().to_string(),
-            version: game.runtime_version().map(|s| s.to_owned()),
-        }
+#[derive(Debug, Error)]
+pub enum RunningError {
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UnsupportedOperation {
+    #[error("Reading raw discs")]
+    ReadingRawDiscs,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn app_error_messages_are_human_readable() {
+        assert_eq!(
+            AppError::NoAppDirs.to_string(),
+            "Failed to parse app directories"
+        );
+        let manifest = bdgm::manifest_builder::ManifestBuilder::valid()
+            .with("runtime", "java")
+            .with("runtime_version", "17")
+            .build();
+        let java = bdgm::game::ValidatedGame::validate_manifest(&manifest)
+            .expect("test manifest should be valid");
+
+        assert_eq!(
+            AppError::LaunchError(LaunchError::RuntimeNotFound(
+                Box::new(java),
+                PathBuf::from("java")
+            ))
+            .to_string(),
+            "Runtime Java 17 (path: `java`) was not found, is it installed?"
+        );
+        assert_eq!(
+            AppError::LaunchError(LaunchError::PortTaken(1234)).to_string(),
+            "Port 1234 is already in use"
+        );
+        assert_eq!(
+            AppError::UnsupportedOnThisPlatform(UnsupportedOperation::ReadingRawDiscs).to_string(),
+            "Reading raw discs is not supported on this platform."
+        );
+        assert_eq!(
+            AppError::UnsupportedOperation(UnsupportedOperation::ReadingRawDiscs).to_string(),
+            "Reading raw discs is not supported."
+        );
+        assert_eq!(AppError::Other("oops".to_string()).to_string(), "oops");
     }
 
-    pub fn from_path(path: &Path, version: Option<String>) -> Self {
-        Self {
-            display: path.display().to_string(),
-            version,
-        }
+    #[test]
+    fn wrapped_errors_keep_their_messages() {
+        let io_error = || io::Error::other("underlying error");
+
+        assert_eq!(
+            AppError::from(ExtractError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(InstallError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(LaunchError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
+        assert_eq!(
+            AppError::from(RunningError::IoError(io_error())).to_string(),
+            "underlying error"
+        );
     }
 }

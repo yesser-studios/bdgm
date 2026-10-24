@@ -5,7 +5,7 @@ use iced::{
     widget::{container, text, text::Text},
 };
 
-use crate::gui::message::Message;
+use crate::gui_ass::message::Message;
 
 pub(super) const BUTTON_TEXT_SIZE: f32 = 20.0;
 

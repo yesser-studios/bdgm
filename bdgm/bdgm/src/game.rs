@@ -1,17 +1,16 @@
-use anyhow::Error;
+use crate::{
+    error::{
+        BDGMError::{self, ArgsInvalid, RuntimeArgsInvalid},
+        BDGMErrors, ExecutableError, IdFormatError, ParserError, VersionFormatError,
+    },
+    runtime::Runtime,
+};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fmt::Write,
     path::{Path, PathBuf},
     str::FromStr,
-};
-
-use crate::{
-    error::{
-        BDGMError::{self},
-        BDGMErrors, ExecutableError, IdFormatError, ParserError,
-    },
-    runtime::Runtime,
 };
 
 /// Raw game struct. Used for parsing DISC.BDGM files using `from_str`.
@@ -47,10 +46,11 @@ impl Game {
 }
 
 impl FromStr for Game {
-    type Err = anyhow::Error;
+    type Err = BDGMErrors;
 
     /// Parses a `Game` from `DISC.BDGM` file contents.
     fn from_str(s: &str) -> Result<Game, Self::Err> {
+        let mut errors = BDGMErrors::default();
         let mut result = Game::new();
 
         let mut lines = s.lines();
@@ -58,13 +58,14 @@ impl FromStr for Game {
             Some(header) => {
                 let split: Vec<_> = header.split('/').collect();
                 if split.len() != 2 || split.first().is_none_or(|x| *x != "BDGM") {
-                    return Err(Error::from(ParserError::InvalidHeader));
+                    errors.add(ParserError::InvalidHeader.into());
                 }
                 split.get(1).map(|x| x.to_string())
             }
             None => None,
         };
 
+        let mut used = HashSet::new();
         for line in lines {
             if let Some(char) = line.chars().nth(0)
                 && char == '#'
@@ -75,25 +76,50 @@ impl FromStr for Game {
                 continue;
             }
 
-            let split = line.split("=").collect::<Vec<&str>>();
-            if split.len() != 2 {
-                continue;
+            let (key, value) = match line.split_once("=") {
+                Some(s) => s,
+                None => continue,
+            };
+
+            if line.chars().nth(0).is_some_and(|c| c.is_whitespace()) {
+                errors.add(ParserError::LeadingWhitespace(line.to_string()).into());
+            } else if key.chars().any(|c| c.is_whitespace()) {
+                errors.add(ParserError::WhitespaceInKey(key.to_string()).into());
             }
-            let key = split[0];
-            let value = split[1];
+            if line.chars().nth_back(0).is_some_and(|c| c.is_whitespace()) {
+                errors.add(ParserError::TrailingWhitespace(line.to_string()).into());
+            }
+
+            if value.is_empty() {
+                errors.add(ParserError::EmptyValue(key.to_string()).into());
+            }
+
+            if used.contains(key) {
+                errors.add(ParserError::DuplicateKey(key.to_string()).into());
+            }
+
+            used.insert(key.to_string());
+
             match key {
                 "name" => result.name = Some(value.to_string()),
                 "id" => result.id = Some(value.to_string()),
                 "version" => result.version = Some(value.to_string()),
                 "executable" => result.executable = Some(value.to_string()),
-                "args" => result.args = serde_json::from_str(value)?,
+                "args" => match serde_json::from_str(value) {
+                    Ok(v) => result.args = v,
+                    Err(e) => errors.add(ArgsInvalid(e.to_string())),
+                },
                 "runtime" => result.runtime = Some(value.to_string()),
                 "runtime_version" => result.runtime_version = Some(value.to_string()),
-                "runtime_args" => result.runtime_args = serde_json::from_str(value)?,
+                "runtime_args" => match serde_json::from_str(value) {
+                    Ok(v) => result.runtime_args = v,
+                    Err(e) => errors.add(RuntimeArgsInvalid(e.to_string())),
+                },
                 _ => {}
             }
         }
 
+        errors.evaluate()?;
         Ok(result)
     }
 }
@@ -131,7 +157,7 @@ impl ValidatedGame {
     /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
     /// errors.
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
-        let mut errors = BDGMErrors(Vec::new());
+        let mut errors = BDGMErrors::default();
 
         let bdgm_version = if game.bdgm_version.is_none_or_empty() {
             errors.add(BDGMError::MissingHeaderVersion);
@@ -214,7 +240,7 @@ impl ValidatedGame {
                 ));
             }
             if !(id.contains('.')
-                && id.split('.').count() >= 2
+                && id.split('.').count() >= 3
                 && id.split('.').all(|seg| {
                     !seg.is_empty()
                         && !seg.starts_with('-')
@@ -228,15 +254,60 @@ impl ValidatedGame {
             }
         }
 
+        if !(version.is_empty()) {
+            for forbidden_char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|'] {
+                if version
+                    .to_lowercase()
+                    .contains(&forbidden_char.to_lowercase().to_string())
+                {
+                    errors
+                        .add(VersionFormatError::ContainsForbiddenCharacter(forbidden_char).into());
+                }
+            }
+            for forbidden_ver in ["..", "."] {
+                if version.to_lowercase() == forbidden_ver.to_lowercase() {
+                    errors.add(
+                        VersionFormatError::ForbiddenVersion(forbidden_ver.to_string()).into(),
+                    );
+                }
+            }
+            for forbidden_seq in ["CON", "PRN", "AUX", "NUL"]
+                .into_iter()
+                .map(str::to_string)
+                .chain((0..=9).flat_map(|n| [format!("COM{n}"), format!("LPT{n}")]))
+            {
+                if version
+                    .to_lowercase()
+                    .contains(&forbidden_seq.to_lowercase())
+                {
+                    errors.add(
+                        VersionFormatError::ContainsForbiddenSequence(forbidden_seq.to_string())
+                            .into(),
+                    );
+                }
+            }
+            for forbidden_end in [".part", ".lock", ".", " "] {
+                if version
+                    .to_lowercase()
+                    .ends_with(&forbidden_end.to_lowercase())
+                {
+                    errors.add(
+                        VersionFormatError::EndsWithForbiddenSequence(forbidden_end.to_string())
+                            .into(),
+                    );
+                }
+            }
+        }
+
         if let Some(runtime) = &runtime
             && *runtime != Runtime::Windows
-                && *runtime != Runtime::HTML
-                && runtime_version.is_none()
-            {
-                errors.add(BDGMError::MandatoryFieldMissing(
-                    "runtime_version".to_string(),
-                ));
-            }
+            && *runtime != Runtime::HTML
+            && runtime_version.is_none()
+        {
+            errors.add(BDGMError::MandatoryFieldMissing(
+                "runtime_version".to_string(),
+            ));
+        }
 
         let executable: Option<PathBuf> = if !executable.is_empty() {
             if executable.contains('\\') {
@@ -307,6 +378,11 @@ impl ValidatedGame {
         Ok(result)
     }
 
+    pub fn validate_manifest(manifest: &str) -> Result<Self, BDGMErrors> {
+        let game = Game::from_str(manifest)?;
+        Self::validate(game)
+    }
+
     pub fn bdgm_version(&self) -> &str {
         &self.bdgm_version
     }
@@ -369,15 +445,13 @@ impl From<ValidatedGame> for Game {
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
-    use std::{fs::File, io::Read, str::FromStr};
+    use std::str::FromStr;
 
-    use crate::game::ValidatedGame;
-    use crate::{game::Game, runtime::Runtime};
+    use crate::game::{Game, ValidatedGame};
+    use crate::runtime::Runtime;
 
-    #[test]
-    fn game_serializes() {
-        let game = Game {
+    fn sample_game() -> Game {
+        Game {
             bdgm_version: Some("1.1".to_string()),
             name: Some("test".to_string()),
             id: Some("com.example.test".to_string()),
@@ -387,42 +461,58 @@ mod test {
             runtime: Some(Runtime::Windows.to_string()),
             runtime_version: Some("10".to_string()),
             runtime_args: Vec::new(),
-        };
+        }
+    }
 
-        let result = ValidatedGame::validate(game).unwrap().to_string().unwrap();
-        let mut file = File::create("./DISC_write.BDGM").unwrap();
-        write!(file, "{result}").unwrap();
+    #[test]
+    fn game_serializes() {
+        let serialized = ValidatedGame::validate(sample_game())
+            .expect("game should validate")
+            .to_string()
+            .expect("game should serialize");
+
+        assert_eq!(
+            serialized,
+            "BDGM/1.1\n\
+             name=test\n\
+             id=com.example.test\n\
+             version=1.0.0\n\
+             executable=game.exe\n\
+             runtime=windows\n\
+             runtime_version=10\n\
+             args=[]\n\
+             runtime_args=[]\n"
+        );
+    }
+
+    #[test]
+    fn game_serialization_round_trips() {
+        let game = sample_game();
+        let serialized = ValidatedGame::validate(game.clone())
+            .expect("game should validate")
+            .to_string()
+            .expect("game should serialize");
+
+        assert_eq!(Game::from_str(&serialized).unwrap(), game);
     }
 
     #[test]
     fn game_deserializes() {
-        let mut file = File::open("./DISC_read.BDGM").unwrap();
-        let mut result = String::new();
-        file.read_to_string(&mut result).unwrap();
-        let game = Game::from_str(&result).unwrap();
-        assert_eq!(game.name.unwrap(), "test");
-        assert_eq!(game.id.unwrap(), "com.example.test");
-        assert_eq!(game.version.unwrap(), "1.0.0");
-        assert_eq!(game.executable.unwrap(), "game.exe");
+        let game = Game::from_str(include_str!("../DISC_read.BDGM")).unwrap();
+        assert_eq!(game.bdgm_version.as_deref(), Some("1.1"));
+        assert_eq!(game.name.as_deref(), Some("test"));
+        assert_eq!(game.id.as_deref(), Some("com.example.test"));
+        assert_eq!(game.version.as_deref(), Some("1.0.0"));
+        assert_eq!(game.executable.as_deref(), Some("game.exe"));
         assert!(game.args.is_empty());
-        assert_eq!(game.runtime.unwrap(), Runtime::Windows.to_string());
-        assert_eq!(game.runtime_version.unwrap(), "10");
+        assert_eq!(game.runtime.as_deref(), Some("windows"));
+        assert_eq!(game.runtime_version.as_deref(), Some("10"));
         assert!(game.runtime_args.is_empty());
     }
 
     #[test]
     fn game_validates() {
-        let game = Game {
-            bdgm_version: Some("1.1".to_string()),
-            name: Some("test".to_string()),
-            id: Some("com.example.test".to_string()),
-            version: Some("1.0.0".to_string()),
-            executable: Some("game.exe".to_string()),
-            args: Vec::new(),
-            runtime: Some(Runtime::Windows.to_string()),
-            runtime_version: Some("10".to_string()),
-            runtime_args: Vec::new(),
-        };
+        let game = sample_game();
 
         let validated = match ValidatedGame::validate(game.clone()) {
             Ok(game) => game,

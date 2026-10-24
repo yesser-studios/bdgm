@@ -14,7 +14,7 @@ BDGM is a UDF specification for storing a cross-platform game.
 DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 - BPF is a text format in UTF-8 encoding.
 - First line must be a format/version specifier: `BDGM/<version>`
-- The rest of the file are key-value pairs separated with the first `=`. Spaces before `=` are forbidden. Whitespace in the value are not ignored.
+- The rest of the file are key-value pairs separated with the first `=`. Spaces before `=` (in the key) are forbidden. Whitespace in the value are not ignored.
 - Leading and trailing whitespaces of the line are forbidden.
 - Empty values are forbidden; if a key is optional, omit it instead of setting it to empty.
 - Duplicate keys are forbidden.
@@ -31,9 +31,15 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
     - `id`: The unique identifier of the stored game in the period-separated kebab-case reverse domain notation. Mandatory.
         - Uses lowercase ASCII characters, digits and hyphens. Spaces are not permitted.
         - This ID must not change between versions.
+        - The ID must have at least three components.
+        - The first part of the ID should be the developer/publisher's domain (io.github.company, etc. are fine) and the second part should be the game's identifier.
         - Separating different components in a larger piece of work within the ID is allowed, such as: `com.example.example-game.main-game`
         - Example: `com.example.my-game`.
-    - `version`: The version of the stored game, in a text representation. Semantic versioning with major, minor and patch versions is suggested but not required. Mandatory.
+    - `version`: The version of the stored game, in a text representation. Mandatory.
+        - Semantic versioning with major, minor and patch (and possibly build) versions is suggested but not required.
+        - All changes to the contents of APP must be in a new version.
+        - The version must resolve to the name of a single directory.
+        - versions ".", ".."; versions containing "CON", "PRN", "AUX", "NUL", "COM[0-9]", "LPT[0-9]"; versions ending with ".part", ".lock", ".", " "; and characters '/', '\', ':', '*', '?', '"', '<', '>', '|' are not allowed.
     - `runtime`: The runtime used to run the stored game. This is one of `java`, `dotnet`, `python`, `html`, `windows`. Other options may be added by future versions of the spec. Mandatory.
     - `runtime_version`: The version of the runtime used to run the stored game (see Runtimes). Optional for `windows` and ignored for `html`, otherwise mandatory.
     - `executable`: The path to the executable to run using the runtime. This is a path to the file relative to the BDGM/APP directory. Mandatory.
@@ -109,8 +115,7 @@ The player must:
 These environment variables must be provided by the players. Games may read these variables to get assets or save data.
 - `BDGM_DATA`: The data dir created by the player. This must be persistent between game executions.
 - `BDGM_CACHE`: The cache dir created by the player. This may be deleted at any time while the game is not running. The player must not delete it while the game is running.
-- `BDGM_APP`: The path to the `APP` directory, not the executable's directory.
-- `BDGM_DISC`: The path to the disc root (`/`, not `/BDGM/`).
+- `BDGM_APP`: The path to the `APP` directory the game is running from (differs from disc/BDGM/APP if the player copied from it).
 - `BDGM_VERSION`: The version of the BDGM specification used by the disc. (e.g. `1.1`)
 - `WINEPREFIX`: Only if the game is `windows`; must be set to a writable location.
 Games must not assume these paths are on the same storage device.

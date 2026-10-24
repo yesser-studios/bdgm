@@ -4,7 +4,7 @@ use iced::{
     widget::{button, container, text},
 };
 
-use crate::gui::{message::Message, state::GameInfo};
+use crate::gui_ass::{message::Message, state::GameInfo};
 
 use super::components::button_text;
 

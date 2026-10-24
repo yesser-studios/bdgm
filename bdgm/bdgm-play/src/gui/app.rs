@@ -3,16 +3,25 @@ use iced::{
     window::{self, icon},
 };
 
-use crate::cli::args::Args;
+use crate::args::Args;
 
-use super::{state::AppState, update::update, view::view};
+use super::{
+    state::{AppState, Status},
+    update::update,
+    view::view,
+};
 
 pub fn run_gui(args: Args) -> iced::Result {
-    let initial_runtime = args.runtime;
-    iced::application(
+    let Args { runtime, .. } = args;
+    let console_hidden = hide_console_if_no_shell();
+    #[cfg(not(windows))]
+    let _ = console_hidden;
+
+    let result = iced::application(
         move || AppState {
-            initial_runtime: initial_runtime.clone(),
-            ..AppState::default()
+            runtime: runtime.clone(),
+            status: Status::Idle(None),
+            disc_picker_discs: None,
         },
         update,
         view,
@@ -31,5 +40,68 @@ pub fn run_gui(args: Args) -> iced::Result {
         }),
         ..Default::default()
     })
-    .run()
+    .run();
+
+    if let Err(error) = &result {
+        eprintln!("Error while running app: {error}");
+
+        // Explorer launches have no shell to print to, so surface the
+        // failure in a dialog instead of losing it.
+        #[cfg(windows)]
+        if console_hidden {
+            rfd::MessageDialog::new()
+                .set_title("bdgm-play error")
+                .set_description(format!("Error while running app: {error}"))
+                .set_level(rfd::MessageLevel::Error)
+                .show();
+        }
+    }
+
+    result
+}
+
+/// Hide the console window if the GUI was launched outside of a shell.
+///
+/// Returns `true` if the console was hidden, `false` otherwise
+/// (non-Windows, no console attached, shared console, or API failure --
+/// in all of these cases keeping the console visible is the safe fallback).
+///
+/// The console is hidden with `ShowWindow(SW_HIDE)` rather than detached with
+/// `FreeConsole`: detaching destroys the console while stdin/stdout/stderr
+/// handles still point at it, so later child-game spawns with inherited stdio
+/// fail with OS error 50 (`ERROR_NOT_SUPPORTED`). Hiding keeps the console
+/// attached (handles stay valid, games inherit the hidden console instead of
+/// popping their own visible one) while making it invisible.
+#[cfg(windows)]
+fn hide_console_if_no_shell() -> bool {
+    use windows_sys::Win32::System::Console::{GetConsoleProcessList, GetConsoleWindow};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SW_HIDE, ShowWindow};
+
+    // SAFETY: All called functions take no borrowed state; the buffer passed
+    // to `GetConsoleProcessList` is a valid local array.
+    unsafe {
+        let window = GetConsoleWindow();
+        if window.is_null() {
+            // No Win32 console attached (e.g. mintty/MSYS2, GUI parent).
+            return false;
+        }
+
+        let mut processes = [0u32; 4];
+        let count = GetConsoleProcessList(processes.as_mut_ptr(), processes.len() as u32);
+        if count != 1 {
+            // 0 = error (keep console as fail-safe); >= 2 (or more than the
+            // buffer holds) = console shared with a shell, keep it visible.
+            return false;
+        }
+
+        // Sole owner, i.e. launched from Explorer/shortcut: hide the window
+        // while staying attached so std handles remain valid.
+        ShowWindow(window, SW_HIDE) != 0
+    }
+}
+
+/// Non-Windows stub: there is no Win32 console to hide.
+#[cfg(not(windows))]
+fn hide_console_if_no_shell() -> bool {
+    false
 }

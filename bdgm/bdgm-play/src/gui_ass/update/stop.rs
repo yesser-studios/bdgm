@@ -19,7 +19,7 @@ pub(super) fn handle_stop_game(state: &mut AppState) -> Task<Message> {
 
 fn handle_stop_process(
     state: &mut AppState,
-    proc: crate::core::launch::ProcessHandle,
+    proc: crate::core_ass::launch::ProcessHandle,
 ) -> Task<Message> {
     state.status = String::from("Stopping game...");
     Task::perform(

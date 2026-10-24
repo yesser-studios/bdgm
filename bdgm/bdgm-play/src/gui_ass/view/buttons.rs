@@ -1,6 +1,6 @@
 use iced::widget::{Button, button};
 
-use crate::gui::message::Message;
+use crate::gui_ass::message::Message;
 
 use super::components::centered_label;
 

@@ -1,70 +1,156 @@
-use std::path::PathBuf;
+use std::{fs, io, path::Path, path::PathBuf, sync::Arc};
 
-use bdgm::{error::BDGMError, game::ValidatedGame};
+use bdgm::game::ValidatedGame;
 use platform_dirs::AppDirs;
 
-use crate::{
-    cli::args::Args,
-    core::error::{
-        AppError,
-        IoError::{self},
-    },
-};
+use super::error::{AppError, Result};
 
-pub struct GameDirs {
-    pub root: PathBuf,
-    pub install: PathBuf,
-    pub cache: PathBuf,
-    pub data: PathBuf,
+pub(super) struct GameDirs {
+    app_dirs: Arc<AppDirs>,
+    id: String,
+    version: String,
+    executable: PathBuf,
 }
 
 impl GameDirs {
-    pub fn from(game: &ValidatedGame, app_dirs: &AppDirs) -> Self {
-        let root = app_dirs.data_dir.join(game.id());
-        let install = root.join("app").join(game.version());
-        let cache = app_dirs.cache_dir.join(game.id());
-        let data = root.join("data");
-
-        GameDirs {
-            root,
-            install,
-            cache,
-            data,
+    pub(super) fn from(game: &ValidatedGame, app_dirs: Arc<AppDirs>) -> Self {
+        Self {
+            app_dirs,
+            id: game.id().to_string(),
+            version: game.version().to_string(),
+            executable: game.executable().clone(),
         }
     }
+
+    pub(super) fn root(&self) -> PathBuf {
+        self.app_dirs.data_dir.join("games").join(&self.id)
+    }
+
+    pub(super) fn install_dir(&self) -> PathBuf {
+        self.root().join("app").join(&self.version)
+    }
+
+    pub(super) fn cache(&self) -> PathBuf {
+        self.app_dirs.cache_dir.join("games").join(&self.id)
+    }
+
+    pub(super) fn data(&self) -> PathBuf {
+        self.root().join("data")
+    }
+
+    pub(super) fn executable(&self) -> PathBuf {
+        self.install_dir().join(&self.executable)
+    }
+
+    pub(super) fn id(&self) -> &str {
+        &self.id
+    }
 }
 
-pub fn get_app_dir_path(args: &Args) -> Option<PathBuf> {
-    args.location.as_ref().map(|p| p.join("BDGM").join("APP"))
+pub(super) fn get_install_dir_path(id: &str, version: &str, app_dirs: &AppDirs) -> PathBuf {
+    app_dirs
+        .data_dir
+        .join("games")
+        .join(id)
+        .join("app")
+        .join(version)
 }
 
-pub fn try_get_executable_path(args: &Args, game: &ValidatedGame) -> anyhow::Result<PathBuf> {
-    let app_dir_path = match get_app_dir_path(args) {
-        Some(p) => p,
-        None => return Err(IoError::PathNone.into()),
-    };
+pub(super) fn get_disc_manifest_path(disc_root: &Path) -> PathBuf {
+    disc_root.join("BDGM").join("DISC.BDGM")
+}
 
-    let executable_path = app_dir_path.join(game.executable());
+pub(super) fn get_disc_app_dir_path(disc_root: &Path) -> PathBuf {
+    disc_root.join("BDGM").join("APP")
+}
 
-    if !executable_path.try_exists()? {
-        return Err(AppError::InvalidGameFile(BDGMError::ExecutableMissing(
-            executable_path.to_string_lossy().into_owned(),
+pub(super) fn get_app_dirs() -> Result<AppDirs> {
+    AppDirs::new(Some("bdgm-play"), true).ok_or(AppError::NoAppDirs)
+}
+
+pub(super) fn create_game_dirs(game_dirs: &GameDirs) -> io::Result<()> {
+    fs::create_dir_all(game_dirs.data())?;
+    fs::create_dir_all(game_dirs.cache())?;
+
+    if let Some(parent) = game_dirs.install_dir().parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::core::test_utils::{TestEnv, manifest, validated_game};
+
+    fn test_game() -> ValidatedGame {
+        validated_game(&manifest(
+            "com.example.test",
+            "1.2.3",
+            "python",
+            "sub/game.py",
+            "[]",
+            "[]",
         ))
-        .into());
     }
 
-    Ok(executable_path)
-}
+    #[test]
+    fn game_dirs_follow_the_documented_tree() {
+        let env = TestEnv::new();
+        let game = test_game();
+        let dirs = env.game_dirs(&game);
 
-pub fn try_get_manifest_path(args: &Args) -> anyhow::Result<PathBuf> {
-    let manifest_path = match args.location.as_ref() {
-        Some(p) => p.join("BDGM").join("DISC.BDGM"),
-        None => return Err(IoError::PathNone.into()),
-    };
-
-    if !manifest_path.try_exists()? {
-        return Err(BDGMError::DiscFileMissing.into());
+        let root = env.app_dirs.data_dir.join("games").join("com.example.test");
+        assert_eq!(dirs.root(), root);
+        assert_eq!(dirs.install_dir(), root.join("app").join("1.2.3"));
+        assert_eq!(dirs.data(), root.join("data"));
+        assert_eq!(
+            dirs.cache(),
+            env.app_dirs
+                .cache_dir
+                .join("games")
+                .join("com.example.test")
+        );
+        assert_eq!(
+            dirs.executable(),
+            root.join("app").join("1.2.3").join("sub/game.py")
+        );
+        assert_eq!(dirs.id(), "com.example.test");
+        assert_eq!(
+            get_install_dir_path("com.example.test", "1.2.3", &env.app_dirs),
+            dirs.install_dir()
+        );
     }
 
-    Ok(manifest_path)
+    #[test]
+    fn disc_paths_point_inside_the_bdgm_directory() {
+        let root = Path::new("disc");
+
+        assert_eq!(
+            get_disc_manifest_path(root),
+            root.join("BDGM").join("DISC.BDGM")
+        );
+        assert_eq!(get_disc_app_dir_path(root), root.join("BDGM").join("APP"));
+    }
+
+    #[test]
+    fn create_game_dirs_creates_data_cache_and_install_parent() {
+        let env = TestEnv::new();
+        let dirs = env.game_dirs(&test_game());
+
+        create_game_dirs(&dirs).expect("create game directories");
+
+        assert!(dirs.data().is_dir());
+        assert!(dirs.cache().is_dir());
+        assert!(
+            dirs.install_dir()
+                .parent()
+                .expect("install parent")
+                .is_dir()
+        );
+        assert!(!dirs.install_dir().exists());
+    }
 }
