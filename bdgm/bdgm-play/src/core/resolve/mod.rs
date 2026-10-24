@@ -17,6 +17,11 @@ mod mounted;
 mod raw_disc;
 mod udf;
 
+/// Reports extraction and resolves a source to an available installation or disc root.
+///
+/// Images and supported raw discs are extracted when no usable installation is
+/// found. Propagates source, validation, and installation-check errors; raw discs
+/// return `UnsupportedOnThisPlatform` outside Windows.
 pub(super) fn resolve(
     source: Source,
     app_dirs: &AppDirs,
@@ -32,6 +37,11 @@ pub(super) fn resolve(
     }
 }
 
+/// Reuses an installation identified by the image manifest, or extracts the UDF image.
+///
+/// Manifest read and parse failures fall back to extraction. A parsed manifest
+/// that fails field validation returns an error. Image opening, UDF, extraction,
+/// and installation-check errors propagate.
 fn resolve_image(
     path: &Path,
     app_dirs: &AppDirs,
@@ -50,6 +60,11 @@ fn resolve_image(
     Ok(ResolvedSource::Extracted(udf::extract(&udf, on_state)?))
 }
 
+/// Resolves a Windows raw disc to an installation or temporary UDF extraction.
+///
+/// Manifest probe failures fall back to extraction; field validation errors and
+/// device, UDF, extraction, and installation-check errors propagate. Other
+/// platforms return `UnsupportedOnThisPlatform`.
 fn resolve_raw_disc(
     path: &Path,
     app_dirs: &AppDirs,
@@ -83,6 +98,10 @@ fn resolve_raw_disc(
     }
 }
 
+/// Reuses an installation or returns the mounted disc root without copying it.
+///
+/// Unreadable or unparseable manifests fall back to the disc root for later
+/// validation. Field validation and installation-check errors propagate.
 fn resolve_mounted(
     path: &Path,
     app_dirs: &AppDirs,
@@ -101,6 +120,9 @@ fn resolve_mounted(
     }))
 }
 
+/// Returns an installed game only if its installation path and executable file exist.
+///
+/// Waits for any installation lock and propagates installation-check errors.
 fn installed_and_available(
     game: ValidatedGame,
     app_dirs: &AppDirs,

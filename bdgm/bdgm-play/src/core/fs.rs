@@ -6,6 +6,13 @@ use std::{
 
 use super::state::{State, StateHandler};
 
+/// Opens or creates a sibling file with an added `.lock` extension and locks it exclusively.
+///
+/// When `blocking` is false, contention returns `WouldBlock`. Otherwise, reports
+/// `WaitingForLock` while waiting and reverts that state when the lock attempt
+/// finishes. The returned file holds the lock until released or dropped.
+///
+/// Parent directories must exist. File opening and locking errors propagate.
 pub(super) fn acquire_lock(
     path: &Path,
     blocking: bool,
@@ -40,6 +47,9 @@ pub(super) fn acquire_lock(
     Ok(file)
 }
 
+/// Opens a file for reading and writing, creating it if missing and preserving existing contents.
+///
+/// Parent directories must exist; file opening errors propagate.
 pub(super) fn open_file(path: &Path) -> io::Result<File> {
     File::options()
         .read(true)
@@ -49,10 +59,14 @@ pub(super) fn open_file(path: &Path) -> io::Result<File> {
         .open(path)
 }
 
+/// Opens or creates the sibling with an added `.part` extension, preserving its contents.
+///
+/// Propagates file opening errors, including a missing parent directory.
 pub(super) fn open_part_file(path: &Path) -> io::Result<File> {
     open_file(&path.with_added_extension("part"))
 }
 
+/// Empties the file and rewinds its cursor, propagating truncation or seek errors.
 pub(super) fn truncate(file: &mut File) -> io::Result<()> {
     file.set_len(0)?;
     file.seek(SeekFrom::Start(0))?;

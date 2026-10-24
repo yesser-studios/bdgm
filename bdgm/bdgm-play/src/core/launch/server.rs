@@ -29,10 +29,18 @@ pub struct HtmlServer {
 }
 
 impl HtmlServer {
+    /// Starts serving `dir` on `127.0.0.1`, using an OS-selected port when `port` is zero.
+    ///
+    /// The URL points to the server root; no browser is opened. An occupied port
+    /// returns `LaunchError::PortTaken`; other socket errors return `LaunchError::IoError`.
     pub async fn start(dir: &Path, port: u16) -> Result<Self> {
         Self::start_with_entry_point(dir, port, String::new()).await
     }
 
+    /// Starts a loopback file server and builds a URL for the relative entry point.
+    ///
+    /// Encodes URL characters while retaining path separators. Port zero selects an
+    /// available port; bind and address lookup errors propagate as launch errors.
     async fn start_with_entry_point(dir: &Path, port: u16, entry_point: String) -> Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", port))
             .await
@@ -66,14 +74,17 @@ impl HtmlServer {
         })
     }
 
+    /// Returns the loopback URL with the bound port and encoded entry point.
     pub fn get_url(&self) -> &str {
         &self.url
     }
 
+    /// Attempts to open the server URL in the default browser, ignoring opening failures.
     pub fn open(&self) {
         let _ = webbrowser::open(self.get_url());
     }
 
+    /// Aborts the server task without waiting for it to stop.
     pub fn kill(&self) {
         self.abort.abort();
     }
@@ -95,6 +106,10 @@ impl HtmlServer {
     }
 }
 
+/// Starts the installed game on its persisted port and attempts to open its entry point.
+///
+/// Propagates app directory, port assignment, and server startup errors.
+/// Browser-opening failures are ignored.
 pub(super) async fn start_server(
     game_dirs: &GameDirs,
     entry_point: String,
@@ -108,11 +123,18 @@ pub(super) async fn start_server(
     Ok(server)
 }
 
+/// Returns or persists a port for the game in the platform app data directory.
+///
+/// Propagates app directory resolution and port assignment errors.
 fn unique_port(id: &str, on_state: &mut dyn StateHandler) -> Result<u16> {
     let app_dirs = get_app_dirs()?;
     unique_port_in(id, &app_dirs, on_state)
 }
 
+/// Loads or assigns the game's port under a file lock, persisting new assignments.
+///
+/// Existing assignments are returned without testing availability. Directory,
+/// lock, port search, and port map read or write errors propagate.
 fn unique_port_in(id: &str, app_dirs: &AppDirs, on_state: &mut dyn StateHandler) -> Result<u16> {
     let ports_path = app_dirs.data_dir.join("ports.json");
 
@@ -137,6 +159,10 @@ fn unique_port_in(id: &str, app_dirs: &AppDirs, on_state: &mut dyn StateHandler)
     Ok(port)
 }
 
+/// Finds an available loopback port absent from the saved map without reserving it after return.
+///
+/// Returns launch I/O errors from socket operations or `AppError::Other` if
+/// 5,000 candidates are already assigned.
 fn find_free_port(ports: &BiMap<String, u16>) -> Result<u16> {
     let mut claimed_listeners = Vec::new();
 
@@ -157,6 +183,10 @@ fn find_free_port(ports: &BiMap<String, u16>) -> Result<u16> {
     ))
 }
 
+/// Reads the port map from the current file cursor; empty contents yield an empty map.
+///
+/// Read failures propagate as launch I/O errors. Invalid JSON or map data returns
+/// a launch I/O error with kind `InvalidData`.
 fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     let mut json = String::new();
     file.read_to_string(&mut json)
@@ -171,6 +201,10 @@ fn load_ports(file: &mut File) -> Result<BiMap<String, u16>> {
     })
 }
 
+/// Writes and syncs the port map to a `.part` sibling, then renames it over `path`.
+///
+/// Also syncs the parent directory on Unix. I/O and serialization failures return
+/// launch I/O errors; an error after rename can leave the new map in place.
 fn save_ports(ports: &BiMap<String, u16>, path: &Path) -> Result<()> {
     let part_path = path.with_added_extension("part");
     let mut file = open_part_file(path).map_err(LaunchError::IoError)?;

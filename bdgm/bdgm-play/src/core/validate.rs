@@ -8,6 +8,10 @@ use super::{
     request::ExtractedSource,
 };
 
+/// Reads and validates the manifest, then checks the APP directory and executable file.
+///
+/// Returns validation errors for missing required entries or invalid manifest
+/// contents. Other manifest read failures propagate as `AppError::IoError`.
 pub(super) fn validate(source: &ExtractedSource) -> Result<ValidatedGame> {
     let manifest_path = get_disc_manifest_path(&source.path);
     let manifest = match fs::read_to_string(&manifest_path) {
@@ -39,6 +43,9 @@ pub(super) fn validate(source: &ExtractedSource) -> Result<ValidatedGame> {
 }
 
 #[allow(clippy::ptr_arg)]
+/// Checks whether the executable beneath `app_path` resolves to a regular file.
+///
+/// Follows symbolic links and returns false for missing paths or metadata errors.
 pub(super) fn executable_exists(game: &ValidatedGame, app_path: &PathBuf) -> bool {
     app_path.join(game.executable()).is_file()
 }

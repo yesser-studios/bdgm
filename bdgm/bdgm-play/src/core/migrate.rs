@@ -27,6 +27,9 @@ pub(super) fn migrate_dirs(app_dirs: &AppDirs) -> io::Result<()> {
     }
 }
 
+/// Attempts to migrate each legacy child directory, ignoring a missing parent.
+///
+/// Returns the first directory read or migration error after attempting all entries.
 fn migrate_parent(parent: &Path) -> io::Result<()> {
     let entries = match fs::read_dir(parent) {
         Ok(entries) => entries,
@@ -51,6 +54,9 @@ fn migrate_parent(parent: &Path) -> io::Result<()> {
     }
 }
 
+/// Moves a directory into `games`, skipping files, `games` itself, and existing destinations.
+///
+/// Propagates entry inspection, directory creation, and rename errors.
 fn migrate_entry(games: &Path, entry: io::Result<fs::DirEntry>) -> io::Result<()> {
     let entry = entry?;
     let file_type = entry.file_type()?;

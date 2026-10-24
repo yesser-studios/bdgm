@@ -28,6 +28,7 @@ impl Default for AppState {
 }
 
 impl Drop for AppState {
+    /// Requests shutdown of the HTML server currently stored in the playing state.
     fn drop(&mut self) {
         // HTML servers do not outlive the window; game processes are allowed
         // to keep running after it closes.

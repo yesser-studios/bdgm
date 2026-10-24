@@ -10,10 +10,15 @@ use crate::core::{
     state::{State, StateHandler},
 };
 
+/// Opens a UDF volume, converting UDF errors to extraction I/O errors with kind `InvalidData`.
 pub(super) fn open_udf_volume<T: io::Read + io::Seek>(reader: T) -> Result<UdfVolume<T>> {
     UdfVolume::open(reader).map_err(udf_error)
 }
 
+/// Probes `BDGM/DISC.BDGM` without validating its field values.
+///
+/// Missing entries, incorrect entry kinds, invalid UTF-8, and parse failures
+/// return `None`. UDF directory and file read failures return extraction errors.
 pub(super) fn get_udf_manifest(udf: &UdfVolume<impl io::Read + io::Seek>) -> Result<Option<Game>> {
     let root = udf.root_dir().map_err(udf_error)?;
 
@@ -43,6 +48,10 @@ pub(super) fn get_udf_manifest(udf: &UdfVolume<impl io::Read + io::Seek>) -> Res
     }
 }
 
+/// Extracts a UDF volume into an owned temporary directory, reporting copied bytes.
+///
+/// Skips names rejected by `is_safe_name`. Temporary storage creation, UDF reads,
+/// and filesystem write errors propagate as extraction errors.
 pub(super) fn extract(
     udf: &UdfVolume<impl io::Read + io::Seek>,
     on_state: &mut dyn StateHandler,
@@ -67,6 +76,11 @@ pub(super) fn extract(
     })
 }
 
+/// Recursively writes directory contents, skipping parent entries and unsafe names.
+///
+/// Updates `current_size` and reports `(current_size, total_size)` in bytes after
+/// each file is written. UDF and filesystem failures return extraction errors
+/// and can leave already written files in `output_path`.
 pub(super) fn extract_dir(
     udf: &UdfVolume<impl io::Read + io::Seek>,
     dir: &UdfDir,
@@ -98,6 +112,9 @@ pub(super) fn extract_dir(
     Ok(())
 }
 
+/// Sums recorded file sizes in bytes beneath entries accepted by `is_safe_name`.
+///
+/// Returns extraction errors if a UDF directory cannot be read.
 fn total_size(udf: &UdfVolume<impl io::Read + io::Seek>, dir: &UdfDir) -> Result<u64> {
     let mut total = 0;
 
@@ -117,6 +134,7 @@ fn total_size(udf: &UdfVolume<impl io::Read + io::Seek>, dir: &UdfDir) -> Result
     Ok(total)
 }
 
+/// Checks whether the host path parser yields exactly one normal component for the name.
 fn is_safe_name(name: &str) -> bool {
     if name.is_empty() {
         return false;

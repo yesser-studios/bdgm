@@ -3,8 +3,10 @@ use std::{fmt::Display, path::PathBuf};
 use bdgm::game::ValidatedGame;
 
 pub trait StateHandler: Send + Sync {
+    /// Receives a preparation state; extraction progress values are byte counts.
     fn change_state(&mut self, state: State);
 
+    /// Requests restoring the state shown before a temporary lock wait.
     fn revert_state(&mut self);
 }
 

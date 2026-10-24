@@ -11,6 +11,11 @@ use super::{
     view::view,
 };
 
+/// Runs the player window, retaining only the runtime override from `args`.
+///
+/// On Windows, attempts to hide a console owned solely by this process. Returns
+/// Iced application errors and also displays them in a dialog if the console
+/// was hidden.
 pub fn run_gui(args: Args) -> iced::Result {
     let Args { runtime, .. } = args;
     let console_hidden = hide_console_if_no_shell();
@@ -62,9 +67,9 @@ pub fn run_gui(args: Args) -> iced::Result {
 
 /// Hide the console window if the GUI was launched outside of a shell.
 ///
-/// Returns `true` if the console was hidden, `false` otherwise
-/// (non-Windows, no console attached, shared console, or API failure --
-/// in all of these cases keeping the console visible is the safe fallback).
+/// Returns `true` when hiding a previously visible console owned solely by this
+/// process. Returns `false` if there is no console, it is shared, its process list
+/// cannot be queried, or the console was already hidden.
 ///
 /// The console is hidden with `ShowWindow(SW_HIDE)` rather than detached with
 /// `FreeConsole`: detaching destroys the console while stdin/stdout/stderr

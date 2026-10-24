@@ -4,6 +4,10 @@ use bdgm::game::Game;
 
 use crate::core::{dirs::get_disc_manifest_path, error::Result};
 
+/// Probes `BDGM/DISC.BDGM` without validating its field values.
+///
+/// All read and parse failures become `Ok(None)` so callers can fall back to
+/// full source validation.
 pub(super) fn get_mounted_manifest(disc_root: &Path) -> Result<Option<Game>> {
     let manifest_path = get_disc_manifest_path(disc_root);
     let manifest = match fs::read_to_string(&manifest_path) {

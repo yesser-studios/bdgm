@@ -49,6 +49,12 @@ impl FromStr for Game {
     type Err = BDGMErrors;
 
     /// Parses a `Game` from `DISC.BDGM` file contents.
+    /// Comments and lines without `=` after the header are ignored. Unknown keys
+    /// are ignored after checking their syntax. Values retain any embedded `=`.
+    ///
+    /// Returns collected header, whitespace, empty-value, duplicate-key, and JSON
+    /// argument errors. Required fields and field values are checked separately
+    /// by `ValidatedGame::validate`; an empty input produces an empty `Game`.
     fn from_str(s: &str) -> Result<Game, Self::Err> {
         let mut errors = BDGMErrors::default();
         let mut result = Game::new();
@@ -156,6 +162,11 @@ impl ValidatedGame {
 
     /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
     /// errors.
+    ///
+    /// Checks required fields, supported BDGM versions, ID and version restrictions,
+    /// runtime names, and executable path syntax. A runtime version is required for
+    /// Java, .NET, and Python, but its value is not checked. This does not inspect the
+    /// filesystem or check whether a compatible runtime is installed.
     pub fn validate(game: Game) -> Result<Self, BDGMErrors> {
         let mut errors = BDGMErrors::default();
 
@@ -378,6 +389,9 @@ impl ValidatedGame {
         Ok(result)
     }
 
+    /// Parses and validates `DISC.BDGM` contents without accessing the filesystem.
+    ///
+    /// Returns parsing errors first; field validation runs only if parsing succeeds.
     pub fn validate_manifest(manifest: &str) -> Result<Self, BDGMErrors> {
         let game = Game::from_str(manifest)?;
         Self::validate(game)

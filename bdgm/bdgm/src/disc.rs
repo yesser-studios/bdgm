@@ -95,6 +95,12 @@ impl Entry {
     }
 
     /// Writes a directory `Entry` including its children into a UDF image file.
+    ///
+    /// Validates `BDGM/DISC.BDGM` and requires an `APP` directory with a direct file
+    /// entry matching the manifest's executable path. Creates or truncates `output`.
+    ///
+    /// Returns errors for a file entry, missing required entries, invalid manifest,
+    /// source or output I/O failures, or UDF writing failures.
     pub fn write_udf(&self, output: PathBuf, revision: UdfRevision) -> anyhow::Result<()> {
         match self {
             Entry::File { source: _, path: _ } => Err(EntryError::EntryIsFile.into()),

@@ -20,11 +20,15 @@ use super::handle::LaunchHandle;
 pub struct GameProcess(Arc<AsyncMutex<tokio::process::Child>>);
 
 impl GameProcess {
+    /// Requests child process termination without waiting; termination request errors are ignored.
     pub async fn kill(&self) {
         let mut child = self.0.lock().await;
         let _ = child.start_kill();
     }
 
+    /// Waits for child exit and returns `Some(status)`, including unsuccessful exits.
+    ///
+    /// Returns `RunningError::IoError` if checking the child status fails.
     pub async fn wait(self) -> Result<Option<ExitStatus>> {
         loop {
             {
@@ -42,6 +46,11 @@ impl GameProcess {
     }
 }
 
+/// Builds an unstarted command with game arguments, BDGM environment variables, and executable CWD.
+///
+/// `runtime` overrides the default runtime command. Windows games run directly on
+/// Windows, ignoring the override and runtime arguments, and use Wine elsewhere.
+/// HTML games return `AppError::Other`; runtime availability is not checked here.
 pub(super) fn build_command(
     installed: &InstalledGame,
     runtime: Option<&Path>,
@@ -113,6 +122,9 @@ pub(super) fn build_command(
     }
 }
 
+/// Returns the game's BDGM paths and specification version for the child environment.
+///
+/// Windows games on other platforms also receive a game-specific `WINEPREFIX`.
 fn get_envvars(installed: &InstalledGame) -> HashMap<&'static str, String> {
     let game_dirs = &installed.game_dirs;
     let mut envvars = HashMap::new();
@@ -142,6 +154,10 @@ fn get_envvars(installed: &InstalledGame) -> HashMap<&'static str, String> {
     envvars
 }
 
+/// Builds an unstarted runtime command with runtime arguments, executable, then game arguments.
+///
+/// Uses `runtime` when provided, otherwise `default_runtime`, and sets the working
+/// directory to the executable's parent, falling back to `install_dir`.
 fn build_bin_command(
     default_runtime: &Path,
     executable: &Path,
@@ -164,6 +180,10 @@ fn build_bin_command(
     Ok(command)
 }
 
+/// Spawns a child with termination requested when its last owning process handle is dropped.
+///
+/// A not-found spawn error becomes `RuntimeNotFound`, except for native Windows
+/// games. Other spawn failures return `LaunchError::IoError`.
 pub(super) fn run_command(
     mut command: tokio::process::Command,
     game: &ValidatedGame,
