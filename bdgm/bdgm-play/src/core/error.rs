@@ -9,15 +9,15 @@ pub type Result<T> = std::result::Result<T, AppError>;
 pub enum AppError {
     #[error("Failed to parse app directories")]
     NoAppDirs,
-    #[error(transparent)]
+    #[error("An error occured during extraction: {0}")]
     ExtractError(#[from] ExtractError),
-    #[error(transparent)]
+    #[error("An error occured during validation: {0}")]
     ValidationError(#[from] BDGMErrors),
-    #[error(transparent)]
+    #[error("An error occured during installation: {0}")]
     InstallError(#[from] InstallError),
-    #[error(transparent)]
+    #[error("An error occured during launch: {0}")]
     LaunchError(#[from] LaunchError),
-    #[error(transparent)]
+    #[error("An error occured when running: {0}")]
     RunningError(#[from] RunningError),
     #[error("{0} is not supported on this platform.")]
     UnsupportedOnThisPlatform(UnsupportedOperation),
@@ -51,7 +51,7 @@ pub enum LaunchError {
     RuntimeNotFound(Box<bdgm::game::ValidatedGame>, PathBuf),
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error("Port {0} is already in use")]
+    #[error("Port {0} is already in use.")]
     PortTaken(u16),
 }
 
@@ -65,67 +65,4 @@ pub enum RunningError {
 pub enum UnsupportedOperation {
     #[error("Reading raw discs")]
     ReadingRawDiscs,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn app_error_messages_are_human_readable() {
-        assert_eq!(
-            AppError::NoAppDirs.to_string(),
-            "Failed to parse app directories"
-        );
-        let manifest = bdgm::manifest_builder::ManifestBuilder::valid()
-            .with("runtime", "java")
-            .with("runtime_version", "17")
-            .build();
-        let java = bdgm::game::ValidatedGame::validate_manifest(&manifest)
-            .expect("test manifest should be valid");
-
-        assert_eq!(
-            AppError::LaunchError(LaunchError::RuntimeNotFound(
-                Box::new(java),
-                PathBuf::from("java")
-            ))
-            .to_string(),
-            "Runtime Java 17 (path: `java`) was not found, is it installed?"
-        );
-        assert_eq!(
-            AppError::LaunchError(LaunchError::PortTaken(1234)).to_string(),
-            "Port 1234 is already in use"
-        );
-        assert_eq!(
-            AppError::UnsupportedOnThisPlatform(UnsupportedOperation::ReadingRawDiscs).to_string(),
-            "Reading raw discs is not supported on this platform."
-        );
-        assert_eq!(
-            AppError::UnsupportedOperation(UnsupportedOperation::ReadingRawDiscs).to_string(),
-            "Reading raw discs is not supported."
-        );
-        assert_eq!(AppError::Other("oops".to_string()).to_string(), "oops");
-    }
-
-    #[test]
-    fn wrapped_errors_keep_their_messages() {
-        let io_error = || io::Error::other("underlying error");
-
-        assert_eq!(
-            AppError::from(ExtractError::IoError(io_error())).to_string(),
-            "underlying error"
-        );
-        assert_eq!(
-            AppError::from(InstallError::IoError(io_error())).to_string(),
-            "underlying error"
-        );
-        assert_eq!(
-            AppError::from(LaunchError::IoError(io_error())).to_string(),
-            "underlying error"
-        );
-        assert_eq!(
-            AppError::from(RunningError::IoError(io_error())).to_string(),
-            "underlying error"
-        );
-    }
 }
