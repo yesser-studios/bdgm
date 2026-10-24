@@ -178,7 +178,7 @@ struct GuiStateHandler (implements StateHandler)
 - revert_state - If last_state is Some, swaps current_state and last_state and sends StateChanged.
 - new(tokio::sync::mpsc::UnboundedSender<Message>) -> Self
 
-on_state_changed(&mut AppState, Arc<State>) -> Task<Message> - If Status is Starting, changes status to Error or Starting(State), based on whether State is Error.
+on_state_changed(&mut AppState, Arc<State>) -> Task<Message> - If Status is Starting(_), changes status to Starting(State).
 
 #### running
 
@@ -388,7 +388,7 @@ pub enum LaunchHandle (implements Clone)
 - GameProcess(GameProcess)
 - HtmlServer(Arc<HtmlServer>)
 - kill(&self) - kills LaunchHandle.
-- wait will only be called by matching and calling wait on GameProcess (HtmlServer would hang indefinitely)
+- wait will only be called by matching and calling wait on LaunchHandle
 
 #### server
 
@@ -440,7 +440,6 @@ pub enum State (implements Display) - used when calling the StateHandler passed 
 - Installing(ValidatedGame)
 - Launching(ValidatedGame)
 - WaitingForLock(PathBuf)
-- Error(AppError)
 
 ### error
 
@@ -473,7 +472,7 @@ pub enum InstallError:
 
 pub enum LaunchError:
 
-- RuntimeNotFound(PathBuf)
+- RuntimeNotFound(Box<ValidatedGame>, PathBuf)
 - IoError(std::io::Error)
 - PortTaken(u16)
 - ...
