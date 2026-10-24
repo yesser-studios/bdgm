@@ -83,7 +83,7 @@ pub(super) fn disc_picker(state: &AppState) -> Element<'_, Message> {
             }
         }
     } else {
-        content = content.push(text("Raw disc is only supported on Windows"));
+        content = content.push(text("Reading raw discs is only supported on Windows."));
     }
 
     content = content.push(
@@ -118,7 +118,7 @@ pub(super) fn playing_view<'a>(
 ) -> Element<'a, Message> {
     let mut content = column![
         text(format!(
-            "Playing {} version {}",
+            "Playing {} version {}...",
             game.name(),
             game.version()
         ))
@@ -138,7 +138,7 @@ pub(super) fn playing_view<'a>(
     .padding(Padding::new(0.0).top(10));
 
     if let LaunchHandle::HtmlServer(server) = handle {
-        content = content.push(text(format!("Serving at {}", server.get_url())).size(14));
+        content = content.push(text(format!("Serving at: {}", server.get_url())).size(14));
         buttons = buttons.push(
             button(centered_button_text("Open"))
                 .width(150)
@@ -160,8 +160,8 @@ pub(super) fn error_view(error: &AppError) -> Element<'_, Message> {
 
 fn exit_message(game: &ValidatedGame, exit_code: &Option<i32>) -> String {
     match exit_code {
-        Some(code) if *code != 0 => format!("{} exited with code {code}", game.name()),
-        _ => format!("{} exited", game.name()),
+        Some(code) if *code != 0 => format!("{} exited with code {code}.", game.name()),
+        _ => format!("{} exited.", game.name()),
     }
 }
 
