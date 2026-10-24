@@ -9,21 +9,21 @@ pub type Result<T> = std::result::Result<T, AppError>;
 pub enum AppError {
     #[error("Failed to parse app directories")]
     NoAppDirs,
-    #[error("An error occured during extraction: {0}")]
+    #[error("An error occurred during extraction: {0}")]
     ExtractError(#[from] ExtractError),
-    #[error("An error occured during validation: {0}")]
+    #[error("An error occurred during validation: {0}")]
     ValidationError(#[from] BDGMErrors),
-    #[error("An error occured during installation: {0}")]
+    #[error("An error occurred during installation: {0}")]
     InstallError(#[from] InstallError),
-    #[error("An error occured during launch: {0}")]
+    #[error("An error occurred during launch: {0}")]
     LaunchError(#[from] LaunchError),
-    #[error("An error occured when running: {0}")]
+    #[error("An error occurred when running: {0}")]
     RunningError(#[from] RunningError),
     #[error("{0} is not supported on this platform.")]
     UnsupportedOnThisPlatform(UnsupportedOperation),
     #[error("{0} is not supported.")]
     UnsupportedOperation(UnsupportedOperation),
-    #[error("An IO error occured: {0}")]
+    #[error("An IO error occurred: {0}")]
     IoError(#[from] io::Error),
     #[error("{0}")]
     Other(String),
