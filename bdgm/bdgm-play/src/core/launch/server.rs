@@ -33,20 +33,25 @@ impl HtmlServer {
     ///
     /// The URL points to the server root; no browser is opened. An occupied port
     /// returns `LaunchError::PortTaken`; other socket errors return `LaunchError::IoError`.
-    pub async fn start(dir: &Path, port: u16) -> Result<Self> {
-        Self::start_with_entry_point(dir, port, String::new()).await
+    pub async fn start(dir: &Path, port: u16, game_name: String) -> Result<Self> {
+        Self::start_with_entry_point(dir, port, String::new(), game_name).await
     }
 
     /// Starts a loopback file server and builds a URL for the relative entry point.
     ///
     /// Encodes URL characters while retaining path separators. Port zero selects an
     /// available port; bind and address lookup errors propagate as launch errors.
-    async fn start_with_entry_point(dir: &Path, port: u16, entry_point: String) -> Result<Self> {
+    async fn start_with_entry_point(
+        dir: &Path,
+        port: u16,
+        entry_point: String,
+        game_name: String,
+    ) -> Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", port))
             .await
             .map_err(|error| {
                 if error.kind() == io::ErrorKind::AddrInUse {
-                    AppError::from(LaunchError::PortTaken(port))
+                    AppError::from(LaunchError::PortTaken(port, game_name))
                 } else {
                     AppError::from(LaunchError::IoError(error))
                 }
@@ -114,10 +119,12 @@ pub(super) async fn start_server(
     game_dirs: &GameDirs,
     entry_point: String,
     on_state: &mut dyn StateHandler,
+    game_name: String,
 ) -> Result<HtmlServer> {
     let port = unique_port(game_dirs.id(), on_state)?;
     let server =
-        HtmlServer::start_with_entry_point(&game_dirs.install_dir(), port, entry_point).await?;
+        HtmlServer::start_with_entry_point(&game_dirs.install_dir(), port, entry_point, game_name)
+            .await?;
     server.open();
 
     Ok(server)
@@ -333,7 +340,7 @@ mod tests {
     async fn html_server_serves_files_and_reports_its_url() {
         let temp = tempdir().expect("create temporary directory");
         fs::write(temp.path().join("index.html"), b"<h1>hello</h1>").expect("write index");
-        let server = HtmlServer::start(temp.path(), 0)
+        let server = HtmlServer::start(temp.path(), 0, "game".to_string())
             .await
             .expect("start HTML server");
         let url = server.get_url().to_string();
@@ -372,11 +379,11 @@ mod tests {
         let port = listener.local_addr().expect("read listener address").port();
         let temp = tempdir().expect("create temporary directory");
 
-        let result = HtmlServer::start(temp.path(), port).await;
+        let result = HtmlServer::start(temp.path(), port, "game".to_string()).await;
 
         assert!(matches!(
             result,
-            Err(AppError::LaunchError(LaunchError::PortTaken(taken))) if taken == port
+            Err(AppError::LaunchError(LaunchError::PortTaken(taken, _))) if taken == port
         ));
         drop(listener);
     }
@@ -385,10 +392,14 @@ mod tests {
     async fn html_server_url_encodes_the_entry_point() {
         let temp = tempdir().expect("create temporary directory");
 
-        let server =
-            HtmlServer::start_with_entry_point(temp.path(), 0, "dir/game file.html".to_string())
-                .await
-                .expect("start HTML server");
+        let server = HtmlServer::start_with_entry_point(
+            temp.path(),
+            0,
+            "dir/game file.html".to_string(),
+            "game".to_string(),
+        )
+        .await
+        .expect("start HTML server");
 
         assert!(server.get_url().ends_with("/dir/game%20file.html"));
 
@@ -399,7 +410,7 @@ mod tests {
     async fn html_server_wait_resolves_after_kill() {
         let temp = tempdir().expect("create temporary directory");
         let server = Arc::new(
-            HtmlServer::start(temp.path(), 0)
+            HtmlServer::start(temp.path(), 0, "game".to_string())
                 .await
                 .expect("start HTML server"),
         );
