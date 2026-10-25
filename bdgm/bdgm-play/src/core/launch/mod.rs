@@ -91,7 +91,13 @@ async fn run_game(
     match game.runtime() {
         Runtime::HTML => {
             let entry_point = game.executable().to_string_lossy().replace('\\', "/");
-            let server = server::start_server(&installed.game_dirs, entry_point, on_state).await?;
+            let server = server::start_server(
+                &installed.game_dirs,
+                entry_point,
+                on_state,
+                game.name().to_string(),
+            )
+            .await?;
 
             Ok(LaunchHandle::HtmlServer(Arc::new(server)))
         }

@@ -51,8 +51,8 @@ pub enum LaunchError {
     RuntimeNotFound(Box<bdgm::game::ValidatedGame>, PathBuf),
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error("Port {0} is already in use.")]
-    PortTaken(u16),
+    #[error("Port {} saved for {} is already in use.", .0, .1)]
+    PortTaken(u16, String),
 }
 
 #[derive(Debug, Error)]
