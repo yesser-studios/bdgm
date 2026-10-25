@@ -151,7 +151,7 @@ impl IsNoneOrEmpty for Option<String> {
 impl ValidatedGame {
     /// Gets a `Vec` of supported BDGM spec versions by this library.
     pub fn get_supported_bdgm_versions() -> Vec<String> {
-        vec!["1.0".to_string(), "1.1".to_string()]
+        vec!["1.0".to_string(), "1.1".to_string(), "1.1.1".to_string()]
     }
 
     /// Validates a raw `Game` and returns a `ValidatedGame` or `BDGMErrors`, a set of validation
