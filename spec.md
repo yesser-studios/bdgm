@@ -25,7 +25,7 @@ DISC.BDGM is a property file in the BDGM Properties Format (BPF):
 - Unknown keys are ignored.
 - Discs with any missing mandatory key must be rejected.
 
-### BDGM/1.1
+### BDGM/1.1.1
 - Keys:
     - `name`: The name of the stored game, spaces included. Mandatory.
     - `id`: The unique identifier of the stored game in the period-separated kebab-case reverse domain notation. Mandatory.
